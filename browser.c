@@ -35,12 +35,11 @@ static gchar *ensure_uri_scheme(const gchar *);
 static void external_handler_run(GtkAction *, gpointer);
 static void grab_environment_configuration(void);
 static void hover_web_view(WebKitWebView *, WebKitHitTestResult *, guint, gpointer);
+static gboolean input_driver(WebKitWebView *, const gchar *);
 static gboolean key_common(GtkWidget *, GdkEvent *, gpointer);
 static gboolean key_downloadmanager(GtkWidget *, GdkEvent *, gpointer);
 static gboolean key_location(GtkWidget *, GdkEvent *, gpointer);
 static gboolean key_web_view(GtkWidget *, GdkEvent *, gpointer);
-static void keywords_load(void);
-static gboolean keywords_try_search(WebKitWebView *, const gchar *);
 static gboolean menu_web_view(WebKitWebView *, WebKitContextMenu *, GdkEvent *,
                               WebKitHitTestResult *, gpointer);
 static gboolean quit_if_nothing_active(void);
@@ -82,7 +81,6 @@ static gdouble global_zoom = 1.0;
 static gchar *history_file = NULL;
 static gchar *home_uri = "about:blank";
 static gboolean initial_wc_setup_done = FALSE;
-static GHashTable *keywords = NULL;
 static gchar *search_text = NULL;
 static gboolean tabbed_automagic = TRUE;
 static gchar *user_agent = NULL;
@@ -648,6 +646,74 @@ hover_web_view(WebKitWebView *web_view, WebKitHitTestResult *ht, guint modifiers
 }
 
 gboolean
+input_driver(WebKitWebView *web_view, const gchar *t)
+{
+    gint child_stdout;
+    GIOChannel *child_stdout_channel;
+    GError *err = NULL;
+    gchar *output = NULL, *f;
+    gchar **tokens = NULL;
+    gint num_tokens = 0;
+    char *argv[] = { "lariza-input-driver", NULL, NULL, NULL };
+
+    argv[1] = g_strdup(webkit_web_view_get_uri(web_view));
+    argv[2] = g_strdup(t);
+
+    if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL,
+                                  NULL, NULL, NULL, &child_stdout, NULL,
+                                  &err))
+    {
+        fprintf(stderr, __NAME__": Could not launch input driver: %s\n", err->message);
+        g_error_free(err);
+        return FALSE;
+    }
+
+    child_stdout_channel = g_io_channel_unix_new(child_stdout);
+    if (child_stdout_channel == NULL)
+    {
+        fprintf(stderr, __NAME__": Could open child's stdout\n");
+        return FALSE;
+    }
+    g_io_channel_read_line(child_stdout_channel, &output, NULL, NULL, NULL);
+    g_io_channel_shutdown(child_stdout_channel, FALSE, NULL);
+    if (output == NULL)
+    {
+        fprintf(stderr, __NAME__": Could not read child's stdout\n");
+        return FALSE;
+    }
+
+    tokens = g_strsplit(g_strstrip(output), " ", 2);
+    for (num_tokens = 0; tokens[num_tokens] != NULL; num_tokens++)
+        /* No body, just count the tokens. */ ;
+
+    if (num_tokens >= 2)
+    {
+        fprintf(stderr, __NAME__": got 2 or more tokens\n");  /* XXX remove debug */
+        if (g_strcmp0(tokens[0], "go_uri") == 0)
+        {
+            fprintf(stderr, __NAME__": go uri '%s'\n", tokens[1]);  /* XXX remove debug */
+            f = ensure_uri_scheme(tokens[1]);
+            webkit_web_view_load_uri(web_view, f);
+            g_free(f);
+        }
+        else if (g_strcmp0(tokens[0], "go_uri_new") == 0)
+        {
+            fprintf(stderr, __NAME__": go uri in new window '%s'\n", tokens[1]);  /* XXX remove debug */
+            f = ensure_uri_scheme(tokens[1]);
+            client_new(f, NULL, TRUE);
+            g_free(f);
+        }
+    }
+
+    g_strfreev(tokens);
+    g_free(output);
+    g_free(argv[1]);
+    g_free(argv[2]);
+
+    return TRUE;
+}
+
+gboolean
 key_common(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
     struct Client *c = (struct Client *)data;
@@ -749,7 +815,6 @@ key_location(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
     struct Client *c = (struct Client *)data;
     const gchar *t;
-    gchar *f;
 
     if (key_common(widget, event, data))
         return TRUE;
@@ -769,12 +834,8 @@ key_location(GtkWidget *widget, GdkEvent *event, gpointer data)
                     search_text = g_strdup(t + 2);  /* XXX whacky */
                     search(c, 0);
                 }
-                else if (!keywords_try_search(WEBKIT_WEB_VIEW(c->web_view), t))
-                {
-                    f = ensure_uri_scheme(t);
-                    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
-                    g_free(f);
-                }
+                else
+                    input_driver(WEBKIT_WEB_VIEW(c->web_view), t);
                 return TRUE;
             case GDK_KEY_Escape:
                 t = webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view));
@@ -839,64 +900,6 @@ key_web_view(GtkWidget *widget, GdkEvent *event, gpointer data)
     }
 
     return FALSE;
-}
-
-void
-keywords_load(void)
-{
-    GError *err = NULL;
-    GIOChannel *channel = NULL;
-    gchar *path = NULL, *buf = NULL;
-    gchar **tokens = NULL;
-
-    keywords = g_hash_table_new(g_str_hash, g_str_equal);
-
-    path = g_build_filename(g_get_user_config_dir(), __NAME__, "keywordsearch",
-                            NULL);
-    channel = g_io_channel_new_file(path, "r", &err);
-    if (channel != NULL)
-    {
-        while (g_io_channel_read_line(channel, &buf, NULL, NULL, NULL)
-               == G_IO_STATUS_NORMAL)
-        {
-            g_strstrip(buf);
-            if (buf[0] != '#')
-            {
-                tokens = g_strsplit(buf, " ", 2);
-                if (tokens[0] != NULL && tokens[1] != NULL)
-                    g_hash_table_insert(keywords, g_strdup(tokens[0]),
-                                        g_strdup(tokens[1]));
-                g_strfreev(tokens);
-            }
-            g_free(buf);
-        }
-        g_io_channel_shutdown(channel, FALSE, NULL);
-    }
-    g_free(path);
-}
-
-gboolean
-keywords_try_search(WebKitWebView *web_view, const gchar *t)
-{
-    gboolean ret = FALSE;
-    gchar **tokens = NULL;
-    gchar *val = NULL, *uri = NULL;
-
-    tokens = g_strsplit(t, " ", 2);
-    if (tokens[0] != NULL && tokens[1] != NULL)
-    {
-        val = g_hash_table_lookup(keywords, tokens[0]);
-        if (val != NULL)
-        {
-            uri = g_strdup_printf((gchar *)val, tokens[1]);
-            webkit_web_view_load_uri(web_view, uri);
-            g_free(uri);
-            ret = TRUE;
-        }
-    }
-    g_strfreev(tokens);
-
-    return ret;
 }
 
 gboolean
@@ -1106,7 +1109,6 @@ main(int argc, char **argv)
         }
     }
 
-    keywords_load();
     if (cooperative_instances)
         cooperation_setup();
     downloadmanager_setup();
