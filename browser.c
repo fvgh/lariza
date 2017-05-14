@@ -32,10 +32,10 @@ static void downloadmanager_cancel(GtkToolButton *, gpointer data);
 static gboolean downloadmanager_delete(GtkWidget *, gpointer);
 static void downloadmanager_setup(void);
 static gchar *ensure_uri_scheme(const gchar *);
-static void external_handler_run(GtkAction *, gpointer);
 static void grab_environment_configuration(void);
 static void hover_web_view(WebKitWebView *, WebKitHitTestResult *, guint, gpointer);
-static gboolean input_driver(WebKitWebView *, const gchar *);
+static gboolean input_driver(WebKitWebView *, gchar *, const gchar *);
+static gboolean input_driver_context_menu(GtkAction *, gpointer);
 static gboolean key_common(GtkWidget *, GdkEvent *, gpointer);
 static gboolean key_downloadmanager(GtkWidget *, GdkEvent *, gpointer);
 static gboolean key_location(GtkWidget *, GdkEvent *, gpointer);
@@ -52,7 +52,7 @@ static void trust_user_certs(WebKitWebContext *);
 
 struct Client
 {
-    gchar *external_handler_uri;
+    gchar *context_menu_uri;
     gchar *hover_uri;
     GtkWidget *location;
     GtkWidget *vbox;
@@ -557,28 +557,6 @@ ensure_uri_scheme(const gchar *t)
 }
 
 void
-external_handler_run(GtkAction *action, gpointer data)
-{
-    struct Client *c = (struct Client *)data;
-    gchar *argv[] = { "lariza-external-handler", "-u", NULL, NULL };
-    GPid pid;
-    GError *err = NULL;
-
-    (void)action;
-
-    argv[2] = c->external_handler_uri;
-    if (!g_spawn_async(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL,
-                       &pid, &err))
-    {
-        fprintf(stderr, __NAME__": Could not launch key handler: %s\n",
-                err->message);
-        g_error_free(err);
-    }
-    else
-        g_spawn_close_pid(pid);
-}
-
-void
 grab_environment_configuration(void)
 {
     const gchar *e;
@@ -646,7 +624,7 @@ hover_web_view(WebKitWebView *web_view, WebKitHitTestResult *ht, guint modifiers
 }
 
 gboolean
-input_driver(WebKitWebView *web_view, const gchar *t)
+input_driver(WebKitWebView *web_view, gchar *context, const gchar *t)
 {
     gint child_stdout;
     GIOChannel *child_stdout_channel;
@@ -654,10 +632,19 @@ input_driver(WebKitWebView *web_view, const gchar *t)
     gchar *output = NULL, *f;
     gchar **tokens = NULL;
     gint num_tokens = 0;
-    char *argv[] = { "lariza-input-driver", NULL, NULL, NULL };
+    char *argv[] = { "lariza-input-driver",
+                     "-c", NULL,
+                     "-u", NULL,
+                     NULL, NULL,
+                     NULL };
 
-    argv[1] = g_strdup(webkit_web_view_get_uri(web_view));
-    argv[2] = g_strdup(t);
+    argv[2] = g_strdup(context);
+    argv[4] = g_strdup(webkit_web_view_get_uri(web_view));
+    if (t != NULL)
+    {
+        argv[5] = "-t";
+        argv[6] = g_strdup(t);
+    }
 
     if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL,
                                   NULL, NULL, NULL, &child_stdout, NULL,
@@ -707,10 +694,21 @@ input_driver(WebKitWebView *web_view, const gchar *t)
 
     g_strfreev(tokens);
     g_free(output);
-    g_free(argv[1]);
     g_free(argv[2]);
+    g_free(argv[4]);
+    if (t != NULL)
+        g_free(argv[6]);
 
     return TRUE;
+}
+
+gboolean
+input_driver_context_menu(GtkAction *action, gpointer data)
+{
+    struct Client *c = (struct Client *)data;
+
+    return input_driver(WEBKIT_WEB_VIEW(c->web_view), "handle_context_menu_uri",
+                        c->context_menu_uri);
 }
 
 gboolean
@@ -765,11 +763,8 @@ key_common(GtkWidget *widget, GdkEvent *event, gpointer data)
                     trust_user_certs(wc);
                     return TRUE;
                 case GDK_KEY_x:  /* launch external handler (left hand) */
-                    if (c->external_handler_uri != NULL)
-                        g_free(c->external_handler_uri);
-                    c->external_handler_uri = g_strdup(
-                        webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view)));
-                    external_handler_run(NULL, c);
+                    input_driver(WEBKIT_WEB_VIEW(c->web_view),
+                                 "handle_current_uri", NULL);
                     return TRUE;
             }
         }
@@ -835,7 +830,7 @@ key_location(GtkWidget *widget, GdkEvent *event, gpointer data)
                     search(c, 0);
                 }
                 else
-                    input_driver(WEBKIT_WEB_VIEW(c->web_view), t);
+                    input_driver(WEBKIT_WEB_VIEW(c->web_view), "inputbox", t);
                 return TRUE;
             case GDK_KEY_Escape:
                 t = webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view));
@@ -924,13 +919,13 @@ menu_web_view(WebKitWebView *web_view, WebKitContextMenu *menu, GdkEvent *ev,
     {
         webkit_context_menu_append(menu, webkit_context_menu_item_new_separator());
 
-        if (c->external_handler_uri != NULL)
-            g_free(c->external_handler_uri);
-        c->external_handler_uri = g_strdup(uri);
+        if (c->context_menu_uri != NULL)
+            g_free(c->context_menu_uri);
+        c->context_menu_uri = g_strdup(uri);
         action = gtk_action_new("external_handler", "Open with external handler",
                                 NULL, NULL);
         g_signal_connect(G_OBJECT(action), "activate",
-                         G_CALLBACK(external_handler_run), data);
+                         G_CALLBACK(input_driver_context_menu), data);
         mi = webkit_context_menu_item_new(action);
         webkit_context_menu_append(menu, mi);
     }

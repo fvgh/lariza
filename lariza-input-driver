@@ -1,20 +1,37 @@
 #!/bin/bash
 
-current_uri=$1
-text_entered=$2
+while getopts c:u:t: name
+do
+    case $name in
+        c) context=$OPTARG ;;
+        u) current_uri=$OPTARG ;;
+        t) text_entered=$OPTARG ;;
+    esac
+done
 
-case "$text_entered" in
-    goo\ *)
-        echo "go_uri https://www.google.com/search?&q=${text_entered#* }"
+case "$context" in
+    inputbox)
+        case "$text_entered" in
+            goo\ *)
+                echo "go_uri https://www.google.com/search?&q=${text_entered#* }"
+                ;;
+            wi\ *)
+                echo "go_uri_new https://en.wikipedia.org/wiki/${text_entered#* }"
+                ;;
+            lynx)
+                xterm -e lynx "$current_uri" &
+                echo nop
+                ;;
+            *)
+                echo "go_uri $text_entered"
+                ;;
+        esac
         ;;
-    wi\ *)
-        echo "go_uri_new https://en.wikipedia.org/wiki/${text_entered#* }"
-        ;;
-    lynx)
-        xterm -e lynx "$current_uri" &
+    handle_context_menu_uri|handle_current_uri)
+        # Some script that can present the user with more options on
+        # what to do. For example:
+        # https://github.com/vain/bin-pub/blob/master/browser-link-handler
+        browser-link-handler -u "$current_uri" &
         echo nop
-        ;;
-    *)
-        echo "go_uri $text_entered"
         ;;
 esac
