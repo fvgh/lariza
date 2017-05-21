@@ -48,7 +48,8 @@ These hotkeys work when either the location bar or the web view is being
 focused.
 .TP
 \fBMod1\fP + \fBx\fP
-Launch the external handler for the currently loaded URI.
+Launch the input driver for the currently loaded URI (context
+\fBhandle_current_uri\fP).
 .TP
 \fBMod1\fP + \fBq\fP
 Close the current window. Quits the entire program if this was the last
@@ -132,22 +133,53 @@ Close the download manager. Active downloads are never aborted. However,
 if there are no more active downloads and no more browsing windows, then
 the entire program will quit.
 .\" --------------------------------------------------------------------
-.SH "KEYWORD BASED SEARCHING"
-In this file, you can configure keywords and the associated URIs:
-\fI~/.config\:/lariza\:/keywordsearch\fP. Each line has to look like
-this:
+.SH "INPUT DRIVER"
+All text entered into \fBlariza\fP's input box will be fed through a
+user supplied script (except when searching the current web page). That
+script is called \(lqthe input driver\(rq. Its file name is
+\fBlariza\-input\-driver\fP and it must be located somewhere in your
+$\fBPATH\fP.
 .P
-\f(CW
-.nf
-\&wi https://en.wikipedia.org/w/index.php?title=Special:Search&search=%s
-.fi
-\fP
+An exemplary implementation is provided by \fBlariza\fP, but the point
+of this script is to allow for user customization. In other words, it's
+your job to extend or rewrite the default implementation.
 .P
-\fBwi\fP is the keyword, so when opening \fBwi foo\fP, \fBlariza\fP
-will search in Wikipedia. Note the \fB%s\fP at the end of the URI: This
-is where your search term will be placed.
+The input driver will always be called with these two parameters:
+\fB\-c\fP \fIcontext\fP \fB\-u\fP \fIcurrent_uri\fP. \fIcontext\fP is
+one of the strings below. Additionally, in some contexts, \fB\-t\fP
+\fIcontext_specific_text\fP will be set.
 .P
-Lines starting with \fB#\fP are ignored.
+Currently supported context strings:
+.TP
+\fBinputbox\fP
+This is the most common case. The user has entered some text into the
+input box and now your script must be decide what to do with it. This is
+the point where you usually implement features like keyword based
+searching. \fIcontext_specific_text\fP will be set to the text entered.
+.TP
+\fBhandle_context_menu_uri\fP
+The user has issued a right-click on some link or some media file and he
+has then selected the item \(lqopen in external handler\(rq. This will
+set \fIcontext_specific_text\fP to the URI under the mouse pointer.
+.TP
+\fBhandle_current_uri\fP
+The user has hit the hotkey for \(lqopen current URI with input
+handler\(rq (\fBMod1\fP + \fBx\fP).
+.P
+The input driver must communicate back to the browser. It does so by
+writing a line to its \fBstdout\fP. Note that \fBlariza\fP will block
+until that line has been read. You can use the following commands:
+.TP
+\fBgo_uri\fP \fIURI\fP
+Open \fIURI\fP in the window from where the input driver was launched.
+.TP
+\fBgo_uri\fP \fIURI\fP
+Open \fIURI\fP in a new window.
+.TP
+\fBnop\fP
+Do nothing.
+.P
+\fBlariza\fP ignores the exit code of the input driver.
 .\" --------------------------------------------------------------------
 .SH "TRUSTED CERTIFICATES"
 By default, \fBlariza\fP trusts whatever CAs are trusted by WebKit, i.e. by
@@ -175,33 +207,6 @@ restart \fBlariza\fP.
 Note: This is NOT equal to certificate pinning. WebKit ignores
 user-specified certificates if the server's certificate can be validated
 by any system-wide CA.
-.\" --------------------------------------------------------------------
-.SH "EXTERNAL URI HANDLER"
-\fBlariza\fP can launch an executable called
-\fIlariza-external-handler\fP. It will be passed the \(lqselected\(rq
-URI as a command line argument:
-.P
-.\f(CW
-.nf
-$ lariza-external-handler -u https://github.com
-.fi
-\fP
-.P
-This executable must be a user-supplied program. It can do anything it
-wants to with that URI. \fBlariza\fP ignores the exit code of the
-handler.
-.P
-The \fB\-u\fP will always be set. This allows you to use \fBgetopt\fP(1)
-like parameter parsing in your program.
-.P
-You can either use the appropriate hotkey (see list above) to launch the
-handler with the currently loaded URI, or you can perform a right click
-on any link, image or media file to use that URI.
-.P
-This mechanism allows you to implement a variety of functions. You might
-want to implement a bookmarking script or a password manager or you
-might simply load the current URI in a different browser. That's up to
-you.
 .\" --------------------------------------------------------------------
 .SH "USING LARIZA WITH TABBED"
 By default, \fBlariza\fP automatically launches an instance of suckless'

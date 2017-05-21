@@ -9,10 +9,10 @@ Features:
 
     - A WebKit2 viewport
     - An input box to change the URI or to search the current page
+    - Behaviour of said input box can be customized by user supplied scripts
     - Built-in launching of suckless' tabbed
     - Built-in download manager
     - Optimized hotkeys: Left hand on keyboard, right hand on mouse
-    - Keyword based searching: Opening "wi foo" will search wikipedia
     - Global content zoom
     - Cooperative instances using FIFOs
     - Certificate trust store
