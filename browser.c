@@ -81,6 +81,7 @@ static gdouble global_zoom = 1.0;
 static gchar *history_file = NULL;
 static gchar *home_uri = "about:blank";
 static gboolean initial_wc_setup_done = FALSE;
+static gchar *search_prefix = ":/";
 static gchar *search_text = NULL;
 static gboolean tabbed_automagic = TRUE;
 static gchar *user_agent = NULL;
@@ -585,6 +586,10 @@ grab_environment_configuration(void)
     if (e != NULL)
         home_uri = g_strdup(e);
 
+    e = g_getenv(__NAME_UPPERCASE__"_SEARCH_PREFIX");
+    if (e != NULL)
+        search_prefix = g_strdup(e);
+
     e = g_getenv(__NAME_UPPERCASE__"_USER_AGENT");
     if (e != NULL)
         user_agent = g_strdup(e);
@@ -753,7 +758,7 @@ key_common(GtkWidget *widget, GdkEvent *event, gpointer data)
                     return TRUE;
                 case GDK_KEY_k:  /* initiate search (BOTH hands) */
                     gtk_widget_grab_focus(c->location);
-                    gtk_entry_set_text(GTK_ENTRY(c->location), ":/");
+                    gtk_entry_set_text(GTK_ENTRY(c->location), search_prefix);
                     gtk_editable_set_position(GTK_EDITABLE(c->location), -1);
                     return TRUE;
                 case GDK_KEY_c:  /* reload trusted certs (left hand) */
@@ -819,11 +824,12 @@ key_location(GtkWidget *widget, GdkEvent *event, gpointer data)
             case GDK_KEY_Return:
                 gtk_widget_grab_focus(c->web_view);
                 t = gtk_entry_get_text(GTK_ENTRY(c->location));
-                if (t != NULL && t[0] == ':' && t[1] == '/')
+                if (t != NULL &&
+                    strncmp(t, search_prefix, strlen(search_prefix)) == 0)
                 {
                     if (search_text != NULL)
                         g_free(search_text);
-                    search_text = g_strdup(t + 2);  /* XXX whacky */
+                    search_text = g_strdup(t + strlen(search_prefix));
                     search(c, 0);
                 }
                 else
