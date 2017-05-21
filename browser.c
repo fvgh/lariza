@@ -675,17 +675,14 @@ input_driver(WebKitWebView *web_view, gchar *context, const gchar *t)
 
     if (num_tokens >= 2)
     {
-        fprintf(stderr, __NAME__": got 2 or more tokens\n");  /* XXX remove debug */
         if (g_strcmp0(tokens[0], "go_uri") == 0)
         {
-            fprintf(stderr, __NAME__": go uri '%s'\n", tokens[1]);  /* XXX remove debug */
             f = ensure_uri_scheme(tokens[1]);
             webkit_web_view_load_uri(web_view, f);
             g_free(f);
         }
         else if (g_strcmp0(tokens[0], "go_uri_new") == 0)
         {
-            fprintf(stderr, __NAME__": go uri in new window '%s'\n", tokens[1]);  /* XXX remove debug */
             f = ensure_uri_scheme(tokens[1]);
             client_new(f, NULL, TRUE);
             g_free(f);
