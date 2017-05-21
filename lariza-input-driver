@@ -1,37 +1,47 @@
 #!/bin/bash
 
+#                                  _
+#    _____  ____ _ _ __ ___  _ __ | | ___
+#   / _ \ \/ / _` | '_ ` _ \| '_ \| |/ _ \
+#  |  __/>  < (_| | | | | | | |_) | |  __/
+#   \___/_/\_\__,_|_| |_| |_| .__/|_|\___|
+#                           |_|
+#
+# This script is an example. It allows for some basic browsing. It does
+# not implement anything magical, though.
+#
+# You -- the user -- are encouraged to customize this script or write
+# your own one.
+
 while getopts c:u:t: name
 do
     case $name in
         c) context=$OPTARG ;;
         u) current_uri=$OPTARG ;;
-        t) text_entered=$OPTARG ;;
+        t) context_specific_text=$OPTARG ;;
     esac
 done
 
 case "$context" in
     inputbox)
-        case "$text_entered" in
-            goo\ *)
-                echo "go_uri https://www.google.com/search?&q=${text_entered#* }"
-                ;;
-            wi\ *)
-                echo "go_uri_new https://en.wikipedia.org/wiki/${text_entered#* }"
-                ;;
-            lynx)
-                xterm -e lynx "$current_uri" &
-                echo nop
+        case "$context_specific_text" in
+            ddg\ *)
+                echo "go_uri https://duckduckgo.com/?q=${context_specific_text#* }"
                 ;;
             *)
-                echo "go_uri $text_entered"
+                echo "go_uri $context_specific_text"
                 ;;
         esac
         ;;
-    handle_context_menu_uri|handle_current_uri)
-        # Some script that can present the user with more options on
-        # what to do. For example:
-        # https://github.com/vain/bin-pub/blob/master/browser-link-handler
-        browser-link-handler -u "$current_uri" &
+
+    # For these two events, there is nothing meaningful that can be done
+    # by default.
+    handle_context_menu_uri)
+        # Do something with the URI in $context_specific_text.
+        echo nop
+        ;;
+    handle_current_uri)
+        # Do something with the URI in $current_uri.
         echo nop
         ;;
 esac
