@@ -12,6 +12,16 @@
 #
 # You -- the user -- are encouraged to customize this script or write
 # your own one.
+#
+# That being said, we launch a per-user script if it exists. This allows
+# distributions to simply install this exemplary file in /usr/bin, while
+# users are still able to customize it.
+
+per_user_driver=${XDG_CONFIG_HOME:-~/.config}/lariza/input-driver
+if test -x "$per_user_driver"
+then
+    exec "$per_user_driver" "$@"
+fi
 
 while getopts c:h:k:t:u: name
 do
@@ -26,18 +36,16 @@ done
 
 case "$context" in
     inputbox)
-        case "$context_specific_text" in
-            ddg\ *)
-                echo "go_uri https://duckduckgo.com/?q=${context_specific_text#* }"
-                ;;
-            *)
-                echo "go_uri $context_specific_text"
-                ;;
-        esac
+        # The variable $context_specific_text contains the text entered
+        # by the user. You could inspect it further to implement key
+        # word based searching or other features.
+        echo "go_uri $context_specific_text"
         ;;
     handle_context_menu_uri)
-        # Do something with the URI in $context_specific_text. There is
-        # nothing meaningful that can be done by default.
+        # Do something with the URI in $context_specific_text.
+        # Replicating the behaviour of lariza's former "external
+        # handler" could be done as follows:
+        lariza-external-handler -u "$context_specific_text" &
         echo nop
         ;;
     hid_button)
@@ -50,6 +58,8 @@ case "$context" in
     hid_key)
         case "$key" in
             Escape)  echo  abort_load              ;;
+            F2)      echo  go_backward             ;;
+            F3)      echo  go_forward              ;;
             M-3)     echo  search_backward         ;;
             M-c)     echo  reload_user_certs       ;;
             M-d)     echo  download_manager_open   ;;
@@ -61,13 +71,19 @@ case "$context" in
             M-q)     echo  quit                    ;;
             M-r)     echo  reload_page             ;;
             M-w)     echo  go_home                 ;;
+            M-x)
+                # Replicating the behaviour of lariza's former "external
+                # handler" could be done as follows:
+                lariza-external-handler -u "$current_uri" &
+                echo nop
+                ;;
         esac
         ;;
     hid_scroll)
         case "$key" in
-            C-y)      echo  zoom_increase  ;;
-            C-Y)      echo  zoom_decrease  ;;
-            C-x|C-X)  echo  zoom_reset     ;;
+            M-y)      echo  zoom_increase  ;;
+            M-Y)      echo  zoom_decrease  ;;
+            M-x|M-X)  echo  zoom_reset     ;;
         esac
         ;;
 esac
