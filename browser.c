@@ -271,6 +271,9 @@ command_abort_load(struct Client *c, struct CommandArguments *a)
 {
     const gchar *t;
 
+    if (c == NULL)
+        return FALSE;
+
     t = webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view));
     gtk_entry_set_text(GTK_ENTRY(c->location), (t == NULL ? __NAME__ : t));
     webkit_web_view_stop_loading(WEBKIT_WEB_VIEW(c->web_view));
@@ -298,6 +301,9 @@ command_download_manager_open(struct Client *c, struct CommandArguments *a)
 gboolean
 command_focus_input_box(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     gtk_widget_grab_focus(c->location);
 
     return TRUE;
@@ -306,6 +312,9 @@ command_focus_input_box(struct Client *c, struct CommandArguments *a)
 gboolean
 command_go_backward(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     webkit_web_view_go_back(WEBKIT_WEB_VIEW(c->web_view));
 
     return TRUE;
@@ -314,6 +323,9 @@ command_go_backward(struct Client *c, struct CommandArguments *a)
 gboolean
 command_go_forward(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     webkit_web_view_go_forward(WEBKIT_WEB_VIEW(c->web_view));
 
     return TRUE;
@@ -323,6 +335,9 @@ gboolean
 command_go_home(struct Client *c, struct CommandArguments *a)
 {
     gchar *f;
+
+    if (c == NULL)
+        return FALSE;
 
     f = ensure_uri_scheme(home_uri);
     webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
@@ -335,6 +350,9 @@ gboolean
 command_go_uri(struct Client *c, struct CommandArguments *a)
 {
     gchar *f;
+
+    if (c == NULL)
+        return FALSE;
 
     f = ensure_uri_scheme(a->string);
     webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
@@ -370,6 +388,9 @@ command_new_tab(struct Client *c, struct CommandArguments *a)
 gboolean
 command_quit(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     gtk_widget_destroy(c->win);
 
     return TRUE;
@@ -378,6 +399,9 @@ command_quit(struct Client *c, struct CommandArguments *a)
 gboolean
 command_reload(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     webkit_web_view_reload_bypass_cache(WEBKIT_WEB_VIEW(c->web_view));
 
     return TRUE;
@@ -386,9 +410,10 @@ command_reload(struct Client *c, struct CommandArguments *a)
 gboolean
 command_reload_user_certs(struct Client *c, struct CommandArguments *a)
 {
-    WebKitWebContext *wc = webkit_web_view_get_context(WEBKIT_WEB_VIEW(c->web_view));
+    if (c == NULL)
+        return FALSE;
 
-    trust_user_certs(wc);
+    trust_user_certs(webkit_web_view_get_context(WEBKIT_WEB_VIEW(c->web_view)));
 
     return TRUE;
 }
@@ -396,6 +421,9 @@ command_reload_user_certs(struct Client *c, struct CommandArguments *a)
 gboolean
 command_search_backward(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     search(c, -1);
 
     return TRUE;
@@ -404,6 +432,9 @@ command_search_backward(struct Client *c, struct CommandArguments *a)
 gboolean
 command_search_forward(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     search(c, 1);
 
     return TRUE;
@@ -412,6 +443,9 @@ command_search_forward(struct Client *c, struct CommandArguments *a)
 gboolean
 command_search_initiate(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     gtk_widget_grab_focus(c->location);
     gtk_entry_set_text(GTK_ENTRY(c->location), search_prefix);
     gtk_editable_set_position(GTK_EDITABLE(c->location), -1);
@@ -423,6 +457,9 @@ gboolean
 command_zoom_decrease(struct Client *c, struct CommandArguments *a)
 {
     gdouble z;
+
+    if (c == NULL)
+        return FALSE;
 
     z = webkit_web_view_get_zoom_level(WEBKIT_WEB_VIEW(c->web_view));
     z -= 0.1;
@@ -436,6 +473,9 @@ command_zoom_increase(struct Client *c, struct CommandArguments *a)
 {
     gdouble z;
 
+    if (c == NULL)
+        return FALSE;
+
     z = webkit_web_view_get_zoom_level(WEBKIT_WEB_VIEW(c->web_view));
     z += 0.1;
     webkit_web_view_set_zoom_level(WEBKIT_WEB_VIEW(c->web_view), z);
@@ -446,6 +486,9 @@ command_zoom_increase(struct Client *c, struct CommandArguments *a)
 gboolean
 command_zoom_reset(struct Client *c, struct CommandArguments *a)
 {
+    if (c == NULL)
+        return FALSE;
+
     webkit_web_view_set_zoom_level(WEBKIT_WEB_VIEW(c->web_view), global_zoom);
 
     return TRUE;
@@ -886,21 +929,23 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     gchar *output = NULL, *t_nc = NULL, *uri_nc = NULL;
     gchar **tokens = NULL;
     gboolean handled = FALSE;
-    WebKitWebView *web_view = WEBKIT_WEB_VIEW(c->web_view);
     char *argv[64] = {0};
     size_t argv_i = 0;
     struct CommandArguments args = {0};
     gboolean (*fn_ptr)(struct Client *, struct CommandArguments *a);
-
-    uri_nc = g_strdup(webkit_web_view_get_uri(web_view));
 
     /* All of this assumes that argv is big enough in the first place
      * and it must be pre-filled with zeroes. See its declaration. */
     argv[argv_i++] = "lariza-input-driver";
     argv[argv_i++] = "-c";
     argv[argv_i++] = context;
-    argv[argv_i++] = "-u";
-    argv[argv_i++] = uri_nc;
+
+    if (c != NULL)
+    {
+        uri_nc = g_strdup(webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view)));
+        argv[argv_i++] = "-u";
+        argv[argv_i++] = uri_nc;
+    }
 
     if (key != NULL)
     {
@@ -915,7 +960,7 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
         argv[argv_i++] = t_nc;
     }
 
-    if (c->hover_uri != NULL)
+    if (c != NULL && c->hover_uri != NULL)
     {
         argv[argv_i++] = "-h";
         argv[argv_i++] = c->hover_uri;
