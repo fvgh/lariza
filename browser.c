@@ -1012,7 +1012,13 @@ key_common(GtkWidget *widget, GdkEvent *event, gpointer data)
         context = "hid_key";
     else if (event->type == GDK_BUTTON_PRESS)
         context = "hid_button";
-    else if (event->type == GDK_SCROLL)
+    else if (event->type == GDK_SCROLL &&
+             (
+              ((GdkEventScroll *)event)->state & GDK_CONTROL_MASK ||
+              ((GdkEventScroll *)event)->state & GDK_MOD1_MASK ||
+              ((GdkEventScroll *)event)->state & GDK_SUPER_MASK
+             )
+            )
         context = "hid_scroll";
 
     if (context != NULL)
