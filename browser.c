@@ -155,7 +155,7 @@ client_new(const gchar *uri, WebKitWebView *related_wv, gboolean show)
     c = calloc(1, sizeof(struct Client));
     if (!c)
     {
-        fprintf(stderr, __NAME__": fatal: calloc failed\n");
+        fprintf(stderr, __NAME__": Fatal: calloc failed\n");
         exit(EXIT_FAILURE);
     }
 
