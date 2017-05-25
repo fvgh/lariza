@@ -941,7 +941,7 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
                                   NULL, NULL, NULL, &child_stdout, NULL,
                                   &err))
     {
-        fprintf(stderr, __NAME__": Could not launch input driver: %s\n", err->message);
+        fprintf(stderr, __NAME__": Fatal: Could not launch input driver: %s\n", err->message);
         g_error_free(err);
         return FALSE;
     }
@@ -949,7 +949,7 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     child_stdout_channel = g_io_channel_unix_new(child_stdout);
     if (child_stdout_channel == NULL)
     {
-        fprintf(stderr, __NAME__": Could open child's stdout\n");
+        fprintf(stderr, __NAME__": Fatal: Could open child's stdout\n");
         return FALSE;
     }
     g_io_channel_read_line(child_stdout_channel, &output, NULL, NULL, NULL);
