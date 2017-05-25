@@ -1051,6 +1051,9 @@ key_common(GtkWidget *widget, GdkEvent *event, gpointer data)
      * Backtraces in GDB indicate that one event comes from
      * WTF::RunLoop::performWork(), the other one doesn't. */
 
+    /* For performance reasons, we only report scroll events if a
+     * modifier key has been pressed as well. */
+
     if (event->type == GDK_KEY_PRESS)
         context = "hid_key";
     else if (event->type == GDK_BUTTON_PRESS)
