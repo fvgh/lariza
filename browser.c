@@ -885,7 +885,6 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     GError *err = NULL;
     gchar *output = NULL, *t_nc = NULL, *uri_nc = NULL;
     gchar **tokens = NULL;
-    gint num_tokens = 0;
     gboolean handled = FALSE;
     WebKitWebView *web_view = WEBKIT_WEB_VIEW(c->web_view);
     char **argv = NULL;
@@ -957,14 +956,13 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     if (output != NULL)
     {
         tokens = g_strsplit(g_strstrip(output), " ", 2);
-        for (num_tokens = 0; tokens[num_tokens] != NULL; num_tokens++)
-            /* No body, just count the tokens. */ ;
-
-        if (num_tokens >= 1)
+        if (tokens[0] != NULL)
         {
             fn_ptr = g_hash_table_lookup(command_hash, tokens[0]);
             if (fn_ptr != NULL)
             {
+                /* tokens[1] is either the second token or the NULL
+                 * terminator of that list, which is fine. */
                 args.string = tokens[1];
                 handled = (*fn_ptr)(c, &args);
             }
