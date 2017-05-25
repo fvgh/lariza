@@ -61,7 +61,6 @@ case "$context" in
             M-q)     echo  quit                    ;;
             M-r)     echo  reload                  ;;
             M-w)     echo  go_home                 ;;
-            *)       echo  nop                     ;;
         esac
         ;;
     hid_scroll)
