@@ -38,7 +38,7 @@ case "$context" in
     handle_context_menu_uri)
         # Do something with the URI in $context_specific_text. There is
         # nothing meaningful that can be done by default.
-        true
+        echo nop
         ;;
     hid_button)
         case "$key" in

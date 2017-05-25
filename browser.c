@@ -943,13 +943,23 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
         tokens = g_strsplit(g_strstrip(output), " ", 2);
         if (tokens[0] != NULL)
         {
-            fn_ptr = g_hash_table_lookup(command_hash, tokens[0]);
-            if (fn_ptr != NULL)
+            if (strncmp(tokens[0], "nop", 3) == 0)
             {
-                /* tokens[1] is either the second token or the NULL
-                 * terminator of that list, which is fine. */
-                args.string = tokens[1];
-                handled = (*fn_ptr)(c, &args);
+                /* The driver might print "nop" to indicate that it did
+                 * do something and that we should not deliver this
+                 * event to Gtk or WebKit. */
+                handled = TRUE;
+            }
+            else
+            {
+                fn_ptr = g_hash_table_lookup(command_hash, tokens[0]);
+                if (fn_ptr != NULL)
+                {
+                    /* tokens[1] is either the second token or the NULL
+                     * terminator of that list, which is fine. */
+                    args.string = tokens[1];
+                    handled = (*fn_ptr)(c, &args);
+                }
             }
         }
     }
