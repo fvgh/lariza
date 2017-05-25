@@ -13,10 +13,11 @@
 # You -- the user -- are encouraged to customize this script or write
 # your own one.
 
-while getopts c:k:t:u: name
+while getopts c:h:k:t:u: name
 do
     case $name in
         c) context=$OPTARG ;;
+        h) hover_uri=$OPTARG ;;
         k) key=$OPTARG ;;
         t) context_specific_text=$OPTARG ;;
         u) current_uri=$OPTARG ;;
@@ -41,7 +42,7 @@ case "$context" in
         ;;
     hid_button)
         case "$key" in
-            2)  echo  go_hover_uri_new_tab  ;;
+            2)  [ -n "$hover_uri" ] && echo go_uri_new_tab "$hover_uri" ;;
             8)  echo  go_backward           ;;
             9)  echo  go_forward            ;;
         esac

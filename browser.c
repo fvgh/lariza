@@ -48,7 +48,6 @@ static gboolean command_focus_input_box(struct Client *, struct CommandArguments
 static gboolean command_go_backward(struct Client *, struct CommandArguments *);
 static gboolean command_go_forward(struct Client *, struct CommandArguments *);
 static gboolean command_go_home(struct Client *, struct CommandArguments *);
-static gboolean command_go_hover_uri_new_tab(struct Client *, struct CommandArguments *);
 static gboolean command_go_uri_new_tab(struct Client *, struct CommandArguments *);
 static gboolean command_go_uri(struct Client *, struct CommandArguments *);
 static gboolean command_new_tab(struct Client *, struct CommandArguments *);
@@ -330,18 +329,6 @@ command_go_home(struct Client *c, struct CommandArguments *a)
     g_free(f);
 
     return TRUE;
-}
-
-gboolean
-command_go_hover_uri_new_tab(struct Client *c, struct CommandArguments *a)
-{
-    if (c->hover_uri != NULL)
-    {
-        client_new(c->hover_uri, NULL, TRUE);
-        return TRUE;
-    }
-
-    return FALSE;
 }
 
 gboolean
@@ -835,8 +822,7 @@ hover_web_view(WebKitWebView *web_view, WebKitHitTestResult *ht, guint modifiers
             gtk_entry_set_text(GTK_ENTRY(c->location),
                                webkit_hit_test_result_get_link_uri(ht));
 
-            if (c->hover_uri != NULL)
-                g_free(c->hover_uri);
+            g_free(c->hover_uri);
             c->hover_uri = g_strdup(webkit_hit_test_result_get_link_uri(ht));
         }
         else
@@ -844,8 +830,7 @@ hover_web_view(WebKitWebView *web_view, WebKitHitTestResult *ht, guint modifiers
             gtk_entry_set_text(GTK_ENTRY(c->location),
                                webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view)));
 
-            if (c->hover_uri != NULL)
-                g_free(c->hover_uri);
+            g_free(c->hover_uri);
             c->hover_uri = NULL;
         }
     }
@@ -929,6 +914,12 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
         t_nc = g_strdup(t);
         spawn_args = g_slist_append(spawn_args, "-t");
         spawn_args = g_slist_append(spawn_args, t_nc);
+    }
+
+    if (c->hover_uri != NULL)
+    {
+        spawn_args = g_slist_append(spawn_args, "-h");
+        spawn_args = g_slist_append(spawn_args, c->hover_uri);
     }
 
     argv = calloc(sizeof (char *), g_slist_length(spawn_args) + 1);
@@ -1077,7 +1068,6 @@ load_command_hash(void)
     g_hash_table_insert(command_hash, "go_backward", command_go_backward);
     g_hash_table_insert(command_hash, "go_forward", command_go_forward);
     g_hash_table_insert(command_hash, "go_home", command_go_home);
-    g_hash_table_insert(command_hash, "go_hover_uri_new_tab", command_go_hover_uri_new_tab);
     g_hash_table_insert(command_hash, "go_uri", command_go_uri);
     g_hash_table_insert(command_hash, "go_uri_new_tab", command_go_uri_new_tab);
     g_hash_table_insert(command_hash, "new_tab", command_new_tab);
