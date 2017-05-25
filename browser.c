@@ -86,7 +86,7 @@ static gboolean menu_web_view(WebKitWebView *, WebKitContextMenu *, GdkEvent *,
                               WebKitHitTestResult *, gpointer);
 static gboolean quit_if_nothing_active(void);
 static gboolean remote_msg(GIOChannel *, GIOCondition, gpointer);
-static void search(gpointer, gint);
+static void search(struct Client *, gint);
 static void show_web_view(WebKitWebView *, gpointer);
 static Window tabbed_launch(void);
 static void trust_user_certs(WebKitWebContext *);
@@ -1207,9 +1207,8 @@ remote_msg(GIOChannel *channel, GIOCondition condition, gpointer data)
 }
 
 void
-search(gpointer data, gint direction)
+search(struct Client *c, gint direction)
 {
-    struct Client *c = (struct Client *)data;
     WebKitWebView *web_view = WEBKIT_WEB_VIEW(c->web_view);
     WebKitFindController *fc = webkit_web_view_get_find_controller(web_view);
 
