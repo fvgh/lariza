@@ -1035,6 +1035,22 @@ key_common(GtkWidget *widget, GdkEvent *event, gpointer data)
     gchar *k, *context = NULL;
     gboolean handled;
 
+    /* XXX There's something odd happening here with key events.
+     *
+     * If we don't return TRUE from this function (which we only should
+     * do if we want to prevent this event from being propagated to
+     * other handlers -- we only want that if input_handler() returns
+     * TRUE), then we get duplicate events. It's not the exact same
+     * event, it has a different address. But all values are identical.
+     * This results in the input driver being spawned twice which is
+     * kind of annoying.
+     *
+     * This has nothing to do with the input driver's new code. This
+     * behaviour can be seen in older versions of lariza as well.
+     *
+     * Backtraces in GDB indicate that one event comes from
+     * WTF::RunLoop::performWork(), the other one doesn't. */
+
     if (event->type == GDK_KEY_PRESS)
         context = "hid_key";
     else if (event->type == GDK_BUTTON_PRESS)
