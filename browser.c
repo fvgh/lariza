@@ -887,53 +887,38 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     gchar **tokens = NULL;
     gboolean handled = FALSE;
     WebKitWebView *web_view = WEBKIT_WEB_VIEW(c->web_view);
-    char **argv = NULL;
+    char *argv[64] = {0};
+    size_t argv_i = 0;
     struct CommandArguments args = {0};
-    GSList *spawn_args = NULL;
-    guint spawn_args_i;
-    size_t i;
     gboolean (*fn_ptr)(struct Client *, struct CommandArguments *a);
 
     uri_nc = g_strdup(webkit_web_view_get_uri(web_view));
 
-    spawn_args = g_slist_append(spawn_args, "lariza-input-driver");
-    spawn_args = g_slist_append(spawn_args, "-c");
-    spawn_args = g_slist_append(spawn_args, context);
-    spawn_args = g_slist_append(spawn_args, "-u");
-    spawn_args = g_slist_append(spawn_args, uri_nc);
+    /* All of this assumes that argv is big enough in the first place
+     * and it must be pre-filled with zeroes. See its declaration. */
+    argv[argv_i++] = "lariza-input-driver";
+    argv[argv_i++] = "-c";
+    argv[argv_i++] = context;
+    argv[argv_i++] = "-u";
+    argv[argv_i++] = uri_nc;
 
     if (key != NULL)
     {
-        spawn_args = g_slist_append(spawn_args, "-k");
-        spawn_args = g_slist_append(spawn_args, key);
+        argv[argv_i++] = "-k";
+        argv[argv_i++] = key;
     }
 
     if (t != NULL)
     {
         t_nc = g_strdup(t);
-        spawn_args = g_slist_append(spawn_args, "-t");
-        spawn_args = g_slist_append(spawn_args, t_nc);
+        argv[argv_i++] = "-t";
+        argv[argv_i++] = t_nc;
     }
 
     if (c->hover_uri != NULL)
     {
-        spawn_args = g_slist_append(spawn_args, "-h");
-        spawn_args = g_slist_append(spawn_args, c->hover_uri);
-    }
-
-    argv = calloc(sizeof (char *), g_slist_length(spawn_args) + 1);
-    if (argv == NULL)
-    {
-        perror(__NAME__": Fatal error in calloc for argv");
-        goto cleanout_nc_and_list;
-    }
-
-    for (spawn_args_i = 0;
-         spawn_args_i < g_slist_length(spawn_args);
-         spawn_args_i++)
-    {
-        argv[spawn_args_i] = g_strdup((char *)(g_slist_nth(spawn_args,
-                                                           spawn_args_i)->data));
+        argv[argv_i++] = "-h";
+        argv[argv_i++] = c->hover_uri;
     }
 
     if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL,
@@ -942,14 +927,14 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     {
         fprintf(stderr, __NAME__": Fatal: Could not launch input driver: %s\n", err->message);
         g_error_free(err);
-        goto cleanout_nc_and_list_and_argv;
+        goto cleanout_nc;
     }
 
     child_stdout_channel = g_io_channel_unix_new(child_stdout);
     if (child_stdout_channel == NULL)
     {
         fprintf(stderr, __NAME__": Fatal: Could open child's stdout\n");
-        goto cleanout_nc_and_list_and_argv;
+        goto cleanout_nc;
     }
     g_io_channel_read_line(child_stdout_channel, &output, NULL, NULL, NULL);
     g_io_channel_shutdown(child_stdout_channel, FALSE, NULL);
@@ -972,13 +957,7 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     g_strfreev(tokens);
     g_free(output);
 
-cleanout_nc_and_list_and_argv:
-    for (i = 0; argv[i] != NULL; i++)
-        g_free(argv[i]);
-    free(argv);
-
-cleanout_nc_and_list:
-    g_slist_free(spawn_args);
+cleanout_nc:
     g_free(uri_nc);
     g_free(t_nc);
 
