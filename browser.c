@@ -926,7 +926,7 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     if (argv == NULL)
     {
         perror(__NAME__": Fatal error in calloc for argv");
-        return FALSE;
+        goto cleanout_nc_and_list;
     }
 
     for (spawn_args_i = 0;
@@ -943,14 +943,14 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     {
         fprintf(stderr, __NAME__": Fatal: Could not launch input driver: %s\n", err->message);
         g_error_free(err);
-        return FALSE;
+        goto cleanout_nc_and_list_and_argv;
     }
 
     child_stdout_channel = g_io_channel_unix_new(child_stdout);
     if (child_stdout_channel == NULL)
     {
         fprintf(stderr, __NAME__": Fatal: Could open child's stdout\n");
-        return FALSE;
+        goto cleanout_nc_and_list_and_argv;
     }
     g_io_channel_read_line(child_stdout_channel, &output, NULL, NULL, NULL);
     g_io_channel_shutdown(child_stdout_channel, FALSE, NULL);
@@ -971,14 +971,18 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
         }
     }
 
+    g_strfreev(tokens);
+    g_free(output);
+
+cleanout_nc_and_list_and_argv:
     for (i = 0; argv[i] != NULL; i++)
         g_free(argv[i]);
+    free(argv);
 
+cleanout_nc_and_list:
     g_slist_free(spawn_args);
     g_free(uri_nc);
     g_free(t_nc);
-    g_strfreev(tokens);
-    g_free(output);
 
     return handled;
 }
