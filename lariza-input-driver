@@ -59,7 +59,7 @@ case "$context" in
             M-l)     echo  focus_input_box         ;;
             M-n)     echo  search_forward          ;;
             M-q)     echo  quit                    ;;
-            M-r)     echo  reload                  ;;
+            M-r)     echo  reload_page             ;;
             M-w)     echo  go_home                 ;;
         esac
         ;;
