@@ -13,11 +13,54 @@
 #include <webkit2/webkit2.h>
 
 
+struct Client
+{
+    gchar *context_menu_uri;
+    gchar *hover_uri;
+    GtkWidget *location;
+    GtkWidget *vbox;
+    GtkWidget *web_view;
+    GtkWidget *win;
+};
+
+struct CommandArguments
+{
+    gchar *string;
+};
+
+struct DownloadManager
+{
+    GtkWidget *scroll;
+    GtkWidget *toolbar;
+    GtkWidget *win;
+} dm;
+
+
 static void client_destroy(GtkWidget *, gpointer);
 static gboolean client_destroy_request(WebKitWebView *, gpointer);
 static WebKitWebView *client_new(const gchar *, WebKitWebView *, gboolean);
 static WebKitWebView *client_new_request(WebKitWebView *, WebKitNavigationAction *,
                                          gpointer);
+static gboolean command_abort_load(struct Client *, struct CommandArguments *);
+static gboolean command_download_manager_close(struct Client *, struct CommandArguments *);
+static gboolean command_download_manager_open(struct Client *, struct CommandArguments *);
+static gboolean command_focus_input_box(struct Client *, struct CommandArguments *);
+static gboolean command_go_backward(struct Client *, struct CommandArguments *);
+static gboolean command_go_forward(struct Client *, struct CommandArguments *);
+static gboolean command_go_home(struct Client *, struct CommandArguments *);
+static gboolean command_go_hover_uri_new_tab(struct Client *, struct CommandArguments *);
+static gboolean command_go_uri_new_tab(struct Client *, struct CommandArguments *);
+static gboolean command_go_uri(struct Client *, struct CommandArguments *);
+static gboolean command_new_tab(struct Client *, struct CommandArguments *);
+static gboolean command_quit(struct Client *, struct CommandArguments *);
+static gboolean command_reload(struct Client *, struct CommandArguments *);
+static gboolean command_reload_user_certs(struct Client *, struct CommandArguments *);
+static gboolean command_search_backward(struct Client *, struct CommandArguments *);
+static gboolean command_search_forward(struct Client *, struct CommandArguments *);
+static gboolean command_search_initiate(struct Client *, struct CommandArguments *);
+static gboolean command_zoom_decrease(struct Client *, struct CommandArguments *);
+static gboolean command_zoom_increase(struct Client *, struct CommandArguments *);
+static gboolean command_zoom_reset(struct Client *, struct CommandArguments *);
 static void cooperation_setup(void);
 static void changed_download_progress(GObject *, GParamSpec *, gpointer);
 static void changed_load_progress(GObject *, GParamSpec *, gpointer);
@@ -34,12 +77,12 @@ static void downloadmanager_setup(void);
 static gchar *ensure_uri_scheme(const gchar *);
 static void grab_environment_configuration(void);
 static void hover_web_view(WebKitWebView *, WebKitHitTestResult *, guint, gpointer);
-static gboolean input_driver(WebKitWebView *, gchar *, const gchar *);
+static gchar *human_event(GdkEvent *);
+static gboolean input_driver(struct Client *, gchar *, gchar *, const gchar *);
 static gboolean input_driver_context_menu(GtkAction *, gpointer);
 static gboolean key_common(GtkWidget *, GdkEvent *, gpointer);
-static gboolean key_downloadmanager(GtkWidget *, GdkEvent *, gpointer);
 static gboolean key_location(GtkWidget *, GdkEvent *, gpointer);
-static gboolean key_web_view(GtkWidget *, GdkEvent *, gpointer);
+static void load_command_hash(void);
 static gboolean menu_web_view(WebKitWebView *, WebKitContextMenu *, GdkEvent *,
                               WebKitHitTestResult *, gpointer);
 static gboolean quit_if_nothing_active(void);
@@ -50,26 +93,9 @@ static Window tabbed_launch(void);
 static void trust_user_certs(WebKitWebContext *);
 
 
-struct Client
-{
-    gchar *context_menu_uri;
-    gchar *hover_uri;
-    GtkWidget *location;
-    GtkWidget *vbox;
-    GtkWidget *web_view;
-    GtkWidget *win;
-};
-
-struct DownloadManager
-{
-    GtkWidget *scroll;
-    GtkWidget *toolbar;
-    GtkWidget *win;
-} dm;
-
-
 static const gchar *accepted_language[2] = { NULL, NULL };
 static gint clients = 0, downloads = 0;
+static GHashTable *command_hash = NULL;
 static gboolean cooperative_alone = TRUE;
 static gboolean cooperative_instances = TRUE;
 static int cooperative_pipe_fp = 0;
@@ -176,11 +202,11 @@ client_new(const gchar *uri, WebKitWebView *related_wv, gboolean show)
     g_signal_connect(G_OBJECT(c->web_view), "decide-policy",
                      G_CALLBACK(decide_policy), NULL);
     g_signal_connect(G_OBJECT(c->web_view), "key-press-event",
-                     G_CALLBACK(key_web_view), c);
+                     G_CALLBACK(key_common), c);
     g_signal_connect(G_OBJECT(c->web_view), "button-press-event",
-                     G_CALLBACK(key_web_view), c);
+                     G_CALLBACK(key_common), c);
     g_signal_connect(G_OBJECT(c->web_view), "scroll-event",
-                     G_CALLBACK(key_web_view), c);
+                     G_CALLBACK(key_common), c);
     g_signal_connect(G_OBJECT(c->web_view), "mouse-target-changed",
                      G_CALLBACK(hover_web_view), c);
     g_signal_connect(G_OBJECT(c->web_view), "web-process-crashed",
@@ -239,6 +265,203 @@ client_new_request(WebKitWebView *web_view,
                    WebKitNavigationAction *navigation_action, gpointer data)
 {
     return client_new(NULL, web_view, FALSE);
+}
+
+gboolean
+command_abort_load(struct Client *c, struct CommandArguments *a)
+{
+    const gchar *t;
+
+    t = webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view));
+    gtk_entry_set_text(GTK_ENTRY(c->location), (t == NULL ? __NAME__ : t));
+    webkit_web_view_stop_loading(WEBKIT_WEB_VIEW(c->web_view));
+    gtk_entry_set_progress_fraction(GTK_ENTRY(c->location), 0);
+
+    return TRUE;
+}
+
+gboolean
+command_download_manager_close(struct Client *c, struct CommandArguments *a)
+{
+    downloadmanager_delete(dm.win, NULL);
+
+    return TRUE;
+}
+
+gboolean
+command_download_manager_open(struct Client *c, struct CommandArguments *a)
+{
+    gtk_widget_show_all(dm.win);
+
+    return TRUE;
+}
+
+gboolean
+command_focus_input_box(struct Client *c, struct CommandArguments *a)
+{
+    gtk_widget_grab_focus(c->location);
+
+    return TRUE;
+}
+
+gboolean
+command_go_backward(struct Client *c, struct CommandArguments *a)
+{
+    webkit_web_view_go_back(WEBKIT_WEB_VIEW(c->web_view));
+
+    return TRUE;
+}
+
+gboolean
+command_go_forward(struct Client *c, struct CommandArguments *a)
+{
+    webkit_web_view_go_forward(WEBKIT_WEB_VIEW(c->web_view));
+
+    return TRUE;
+}
+
+gboolean
+command_go_home(struct Client *c, struct CommandArguments *a)
+{
+    gchar *f;
+
+    f = ensure_uri_scheme(home_uri);
+    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
+    g_free(f);
+
+    return TRUE;
+}
+
+gboolean
+command_go_hover_uri_new_tab(struct Client *c, struct CommandArguments *a)
+{
+    if (c->hover_uri != NULL)
+    {
+        client_new(c->hover_uri, NULL, TRUE);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+gboolean
+command_go_uri(struct Client *c, struct CommandArguments *a)
+{
+    gchar *f;
+
+    f = ensure_uri_scheme(a->string);
+    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
+    g_free(f);
+
+    return TRUE;
+}
+
+gboolean
+command_go_uri_new_tab(struct Client *c, struct CommandArguments *a)
+{
+    gchar *f;
+
+    f = ensure_uri_scheme(a->string);
+    client_new(f, NULL, TRUE);
+    g_free(f);
+
+    return TRUE;
+}
+
+gboolean
+command_new_tab(struct Client *c, struct CommandArguments *a)
+{
+    gchar *f;
+
+    f = ensure_uri_scheme(home_uri);
+    client_new(f, NULL, TRUE);
+    g_free(f);
+
+    return TRUE;
+}
+
+gboolean
+command_quit(struct Client *c, struct CommandArguments *a)
+{
+    gtk_widget_destroy(c->win);
+
+    return TRUE;
+}
+
+gboolean
+command_reload(struct Client *c, struct CommandArguments *a)
+{
+    webkit_web_view_reload_bypass_cache(WEBKIT_WEB_VIEW(c->web_view));
+
+    return TRUE;
+}
+
+gboolean
+command_reload_user_certs(struct Client *c, struct CommandArguments *a)
+{
+    WebKitWebContext *wc = webkit_web_view_get_context(WEBKIT_WEB_VIEW(c->web_view));
+
+    trust_user_certs(wc);
+
+    return TRUE;
+}
+
+gboolean
+command_search_backward(struct Client *c, struct CommandArguments *a)
+{
+    search(c, -1);
+
+    return TRUE;
+}
+
+gboolean
+command_search_forward(struct Client *c, struct CommandArguments *a)
+{
+    search(c, 1);
+
+    return TRUE;
+}
+
+gboolean
+command_search_initiate(struct Client *c, struct CommandArguments *a)
+{
+    gtk_widget_grab_focus(c->location);
+    gtk_entry_set_text(GTK_ENTRY(c->location), search_prefix);
+    gtk_editable_set_position(GTK_EDITABLE(c->location), -1);
+
+    return TRUE;
+}
+
+gboolean
+command_zoom_decrease(struct Client *c, struct CommandArguments *a)
+{
+    gdouble z;
+
+    z = webkit_web_view_get_zoom_level(WEBKIT_WEB_VIEW(c->web_view));
+    z -= 0.1;
+    webkit_web_view_set_zoom_level(WEBKIT_WEB_VIEW(c->web_view), z);
+
+    return TRUE;
+}
+
+gboolean
+command_zoom_increase(struct Client *c, struct CommandArguments *a)
+{
+    gdouble z;
+
+    z = webkit_web_view_get_zoom_level(WEBKIT_WEB_VIEW(c->web_view));
+    z += 0.1;
+    webkit_web_view_set_zoom_level(WEBKIT_WEB_VIEW(c->web_view), z);
+
+    return TRUE;
+}
+
+gboolean
+command_zoom_reset(struct Client *c, struct CommandArguments *a)
+{
+    webkit_web_view_set_zoom_level(WEBKIT_WEB_VIEW(c->web_view), global_zoom);
+
+    return TRUE;
 }
 
 void
@@ -515,7 +738,7 @@ downloadmanager_setup(void)
     g_signal_connect(G_OBJECT(dm.win), "delete-event",
                      G_CALLBACK(downloadmanager_delete), NULL);
     g_signal_connect(G_OBJECT(dm.win), "key-press-event",
-                     G_CALLBACK(key_downloadmanager), NULL);
+                     G_CALLBACK(key_common), NULL);
 
     dm.toolbar = gtk_toolbar_new();
     gtk_orientable_set_orientation(GTK_ORIENTABLE(dm.toolbar),
@@ -628,27 +851,99 @@ hover_web_view(WebKitWebView *web_view, WebKitHitTestResult *ht, guint modifiers
     }
 }
 
+gchar *
+human_event(GdkEvent *event)
+{
+    GdkEventButton *evb;
+    GdkEventKey *evk;
+    GdkEventScroll *evs;
+    gdouble dx, dy;
+
+    if (event->type == GDK_KEY_PRESS)
+    {
+        evk = (GdkEventKey *)event;
+        return g_strdup_printf("%s%s%s%s",
+                               evk->state & GDK_CONTROL_MASK ? "C-" : "",
+                               evk->state & GDK_MOD1_MASK ? "M-" : "",
+                               evk->state & GDK_SUPER_MASK ? "S-" : "",
+                               gdk_keyval_name(evk->keyval));
+    }
+    else if (event->type == GDK_BUTTON_PRESS)
+    {
+        evb = (GdkEventButton *)event;
+        return g_strdup_printf("%s%s%s%d",
+                               evb->state & GDK_CONTROL_MASK ? "C-" : "",
+                               evb->state & GDK_MOD1_MASK ? "M-" : "",
+                               evb->state & GDK_SUPER_MASK ? "S-" : "",
+                               evb->button);
+    }
+    else if (event->type == GDK_SCROLL)
+    {
+        evs = (GdkEventScroll *)event;
+        gdk_event_get_scroll_deltas(event, &dx, &dy);
+        return g_strdup_printf("%s%s%s%s",
+                               evs->state & GDK_CONTROL_MASK ? "C-" : "",
+                               evs->state & GDK_MOD1_MASK ? "M-" : "",
+                               evs->state & GDK_SUPER_MASK ? "S-" : "",
+                               dx != 0 ? (dx < 0 ? "x" : "X") :
+                                         (dy < 0 ? "y" : "Y"));
+    }
+
+    return g_strdup("<unexpected event type>");
+}
+
 gboolean
-input_driver(WebKitWebView *web_view, gchar *context, const gchar *t)
+input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
 {
     gint child_stdout;
     GIOChannel *child_stdout_channel;
     GError *err = NULL;
-    gchar *output = NULL, *f;
+    gchar *output = NULL, *t_nc = NULL, *uri_nc = NULL;
     gchar **tokens = NULL;
     gint num_tokens = 0;
-    char *argv[] = { "lariza-input-driver",
-                     "-c", NULL,
-                     "-u", NULL,
-                     NULL, NULL,
-                     NULL };
+    gboolean handled = FALSE;
+    WebKitWebView *web_view = WEBKIT_WEB_VIEW(c->web_view);
+    char **argv = NULL;
+    struct CommandArguments args = {0};
+    GSList *spawn_args = NULL;
+    guint spawn_args_i;
+    size_t i;
+    gboolean (*fn_ptr)(struct Client *, struct CommandArguments *a);
 
-    argv[2] = g_strdup(context);
-    argv[4] = g_strdup(webkit_web_view_get_uri(web_view));
+    uri_nc = g_strdup(webkit_web_view_get_uri(web_view));
+
+    spawn_args = g_slist_append(spawn_args, "lariza-input-driver");
+    spawn_args = g_slist_append(spawn_args, "-c");
+    spawn_args = g_slist_append(spawn_args, context);
+    spawn_args = g_slist_append(spawn_args, "-u");
+    spawn_args = g_slist_append(spawn_args, uri_nc);
+
+    if (key != NULL)
+    {
+        spawn_args = g_slist_append(spawn_args, "-k");
+        spawn_args = g_slist_append(spawn_args, key);
+    }
+
     if (t != NULL)
     {
-        argv[5] = "-t";
-        argv[6] = g_strdup(t);
+        t_nc = g_strdup(t);
+        spawn_args = g_slist_append(spawn_args, "-t");
+        spawn_args = g_slist_append(spawn_args, t_nc);
+    }
+
+    argv = calloc(sizeof (char *), g_slist_length(spawn_args) + 1);
+    if (argv == NULL)
+    {
+        perror(__NAME__": Fatal error in calloc for argv");
+        return FALSE;
+    }
+
+    for (spawn_args_i = 0;
+         spawn_args_i < g_slist_length(spawn_args);
+         spawn_args_i++)
+    {
+        argv[spawn_args_i] = g_strdup((char *)(g_slist_nth(spawn_args,
+                                                           spawn_args_i)->data));
     }
 
     if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL,
@@ -668,40 +963,33 @@ input_driver(WebKitWebView *web_view, gchar *context, const gchar *t)
     }
     g_io_channel_read_line(child_stdout_channel, &output, NULL, NULL, NULL);
     g_io_channel_shutdown(child_stdout_channel, FALSE, NULL);
-    if (output == NULL)
+    if (output != NULL)
     {
-        fprintf(stderr, __NAME__": Could not read child's stdout\n");
-        return FALSE;
-    }
+        tokens = g_strsplit(g_strstrip(output), " ", 2);
+        for (num_tokens = 0; tokens[num_tokens] != NULL; num_tokens++)
+            /* No body, just count the tokens. */ ;
 
-    tokens = g_strsplit(g_strstrip(output), " ", 2);
-    for (num_tokens = 0; tokens[num_tokens] != NULL; num_tokens++)
-        /* No body, just count the tokens. */ ;
-
-    if (num_tokens >= 2)
-    {
-        if (g_strcmp0(tokens[0], "go_uri") == 0)
+        if (num_tokens >= 1)
         {
-            f = ensure_uri_scheme(tokens[1]);
-            webkit_web_view_load_uri(web_view, f);
-            g_free(f);
-        }
-        else if (g_strcmp0(tokens[0], "go_uri_new") == 0)
-        {
-            f = ensure_uri_scheme(tokens[1]);
-            client_new(f, NULL, TRUE);
-            g_free(f);
+            fn_ptr = g_hash_table_lookup(command_hash, tokens[0]);
+            if (fn_ptr != NULL)
+            {
+                args.string = tokens[1];
+                handled = (*fn_ptr)(c, &args);
+            }
         }
     }
 
+    for (i = 0; argv[i] != NULL; i++)
+        g_free(argv[i]);
+
+    g_slist_free(spawn_args);
+    g_free(uri_nc);
+    g_free(t_nc);
     g_strfreev(tokens);
     g_free(output);
-    g_free(argv[2]);
-    g_free(argv[4]);
-    if (t != NULL)
-        g_free(argv[6]);
 
-    return TRUE;
+    return handled;
 }
 
 gboolean
@@ -709,7 +997,7 @@ input_driver_context_menu(GtkAction *action, gpointer data)
 {
     struct Client *c = (struct Client *)data;
 
-    return input_driver(WEBKIT_WEB_VIEW(c->web_view), "handle_context_menu_uri",
+    return input_driver(c, "handle_context_menu_uri", NULL,
                         c->context_menu_uri);
 }
 
@@ -717,91 +1005,22 @@ gboolean
 key_common(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
     struct Client *c = (struct Client *)data;
-    WebKitWebContext *wc = webkit_web_view_get_context(WEBKIT_WEB_VIEW(c->web_view));
-    gchar *f;
+    gchar *k, *context = NULL;
+    gboolean handled;
 
     if (event->type == GDK_KEY_PRESS)
-    {
-        if (((GdkEventKey *)event)->state & GDK_MOD1_MASK)
-        {
-            switch (((GdkEventKey *)event)->keyval)
-            {
-                case GDK_KEY_q:  /* close window (left hand) */
-                    gtk_widget_destroy(c->win);
-                    return TRUE;
-                case GDK_KEY_w:  /* home (left hand) */
-                    f = ensure_uri_scheme(home_uri);
-                    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
-                    g_free(f);
-                    return TRUE;
-                case GDK_KEY_e:  /* new tab (left hand) */
-                    f = ensure_uri_scheme(home_uri);
-                    client_new(f, NULL, TRUE);
-                    g_free(f);
-                    return TRUE;
-                case GDK_KEY_r:  /* reload (left hand) */
-                    webkit_web_view_reload_bypass_cache(WEBKIT_WEB_VIEW(
-                                                        c->web_view));
-                    return TRUE;
-                case GDK_KEY_d:  /* download manager (left hand) */
-                    gtk_widget_show_all(dm.win);
-                    return TRUE;
-                case GDK_KEY_2:  /* search forward (left hand) */
-                case GDK_KEY_n:  /* search forward (maybe both hands) */
-                    search(c, 1);
-                    return TRUE;
-                case GDK_KEY_3:  /* search backward (left hand) */
-                    search(c, -1);
-                    return TRUE;
-                case GDK_KEY_l:  /* location (BOTH hands) */
-                    gtk_widget_grab_focus(c->location);
-                    return TRUE;
-                case GDK_KEY_k:  /* initiate search (BOTH hands) */
-                    gtk_widget_grab_focus(c->location);
-                    gtk_entry_set_text(GTK_ENTRY(c->location), search_prefix);
-                    gtk_editable_set_position(GTK_EDITABLE(c->location), -1);
-                    return TRUE;
-                case GDK_KEY_c:  /* reload trusted certs (left hand) */
-                    trust_user_certs(wc);
-                    return TRUE;
-                case GDK_KEY_x:  /* launch external handler (left hand) */
-                    input_driver(WEBKIT_WEB_VIEW(c->web_view),
-                                 "handle_current_uri", NULL);
-                    return TRUE;
-            }
-        }
-        /* navigate backward (left hand) */
-        else if (((GdkEventKey *)event)->keyval == GDK_KEY_F2)
-        {
-            webkit_web_view_go_back(WEBKIT_WEB_VIEW(c->web_view));
-            return TRUE;
-        }
-        /* navigate forward (left hand) */
-        else if (((GdkEventKey *)event)->keyval == GDK_KEY_F3)
-        {
-            webkit_web_view_go_forward(WEBKIT_WEB_VIEW(c->web_view));
-            return TRUE;
-        }
-    }
+        context = "hid_key";
+    else if (event->type == GDK_BUTTON_PRESS)
+        context = "hid_button";
+    else if (event->type == GDK_SCROLL)
+        context = "hid_scroll";
 
-    return FALSE;
-}
-
-gboolean
-key_downloadmanager(GtkWidget *widget, GdkEvent *event, gpointer data)
-{
-    if (event->type == GDK_KEY_PRESS)
+    if (context != NULL)
     {
-        if (((GdkEventKey *)event)->state & GDK_MOD1_MASK)
-        {
-            switch (((GdkEventKey *)event)->keyval)
-            {
-                case GDK_KEY_d:  /* close window (left hand) */
-                case GDK_KEY_q:
-                    downloadmanager_delete(dm.win, NULL);
-                    return TRUE;
-            }
-        }
+        k = human_event(event);
+        handled = input_driver(c, context, k, NULL);
+        g_free(k);
+        return handled;
     }
 
     return FALSE;
@@ -833,12 +1052,7 @@ key_location(GtkWidget *widget, GdkEvent *event, gpointer data)
                     search(c, 0);
                 }
                 else
-                    input_driver(WEBKIT_WEB_VIEW(c->web_view), "inputbox", t);
-                return TRUE;
-            case GDK_KEY_Escape:
-                t = webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view));
-                gtk_entry_set_text(GTK_ENTRY(c->location),
-                                   (t == NULL ? __NAME__ : t));
+                    input_driver(c, "inputbox", NULL, t);
                 return TRUE;
         }
     }
@@ -846,58 +1060,30 @@ key_location(GtkWidget *widget, GdkEvent *event, gpointer data)
     return FALSE;
 }
 
-gboolean
-key_web_view(GtkWidget *widget, GdkEvent *event, gpointer data)
+void
+load_command_hash(void)
 {
-    struct Client *c = (struct Client *)data;
-    gdouble dx, dy;
-    gfloat z;
-
-    if (key_common(widget, event, data))
-        return TRUE;
-
-    if (event->type == GDK_KEY_PRESS)
-    {
-        if (((GdkEventKey *)event)->keyval == GDK_KEY_Escape)
-        {
-            webkit_web_view_stop_loading(WEBKIT_WEB_VIEW(c->web_view));
-            gtk_entry_set_progress_fraction(GTK_ENTRY(c->location), 0);
-        }
-    }
-    else if (event->type == GDK_BUTTON_PRESS)
-    {
-        switch (((GdkEventButton *)event)->button)
-        {
-            case 2:
-                if (c->hover_uri != NULL)
-                {
-                    client_new(c->hover_uri, NULL, TRUE);
-                    return TRUE;
-                }
-                break;
-            case 8:
-                webkit_web_view_go_back(WEBKIT_WEB_VIEW(c->web_view));
-                return TRUE;
-            case 9:
-                webkit_web_view_go_forward(WEBKIT_WEB_VIEW(c->web_view));
-                return TRUE;
-        }
-    }
-    else if (event->type == GDK_SCROLL)
-    {
-        if (((GdkEventScroll *)event)->state & GDK_MOD1_MASK ||
-            ((GdkEventScroll *)event)->state & GDK_CONTROL_MASK)
-        {
-            gdk_event_get_scroll_deltas(event, &dx, &dy);
-            z = webkit_web_view_get_zoom_level(WEBKIT_WEB_VIEW(c->web_view));
-            z += -dy * 0.1;
-            z = dx != 0 ? global_zoom : z;
-            webkit_web_view_set_zoom_level(WEBKIT_WEB_VIEW(c->web_view), z);
-            return TRUE;
-        }
-    }
-
-    return FALSE;
+    command_hash = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(command_hash, "abort_load", command_abort_load);
+    g_hash_table_insert(command_hash, "download_manager_close", command_download_manager_close);
+    g_hash_table_insert(command_hash, "download_manager_open", command_download_manager_open);
+    g_hash_table_insert(command_hash, "focus_input_box", command_focus_input_box);
+    g_hash_table_insert(command_hash, "go_backward", command_go_backward);
+    g_hash_table_insert(command_hash, "go_forward", command_go_forward);
+    g_hash_table_insert(command_hash, "go_home", command_go_home);
+    g_hash_table_insert(command_hash, "go_hover_uri_new_tab", command_go_hover_uri_new_tab);
+    g_hash_table_insert(command_hash, "go_uri", command_go_uri);
+    g_hash_table_insert(command_hash, "go_uri_new_tab", command_go_uri_new_tab);
+    g_hash_table_insert(command_hash, "new_tab", command_new_tab);
+    g_hash_table_insert(command_hash, "quit", command_quit);
+    g_hash_table_insert(command_hash, "reload_page", command_reload);
+    g_hash_table_insert(command_hash, "reload_user_certs", command_reload_user_certs);
+    g_hash_table_insert(command_hash, "search_backward", command_search_backward);
+    g_hash_table_insert(command_hash, "search_forward", command_search_forward);
+    g_hash_table_insert(command_hash, "search_initiate", command_search_initiate);
+    g_hash_table_insert(command_hash, "zoom_decrease", command_zoom_decrease);
+    g_hash_table_insert(command_hash, "zoom_increase", command_zoom_increase);
+    g_hash_table_insert(command_hash, "zoom_reset", command_zoom_reset);
 }
 
 gboolean
@@ -1085,6 +1271,7 @@ main(int argc, char **argv)
     webkit_web_context_set_process_model(webkit_web_context_get_default(),
         WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES);
 
+    load_command_hash();
     grab_environment_configuration();
 
     while ((opt = getopt(argc, argv, "e:CT")) != -1)

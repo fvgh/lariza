@@ -13,12 +13,13 @@
 # You -- the user -- are encouraged to customize this script or write
 # your own one.
 
-while getopts c:u:t: name
+while getopts c:k:t:u: name
 do
     case $name in
         c) context=$OPTARG ;;
-        u) current_uri=$OPTARG ;;
+        k) key=$OPTARG ;;
         t) context_specific_text=$OPTARG ;;
+        u) current_uri=$OPTARG ;;
     esac
 done
 
@@ -33,15 +34,40 @@ case "$context" in
                 ;;
         esac
         ;;
-
-    # For these two events, there is nothing meaningful that can be done
-    # by default.
     handle_context_menu_uri)
-        # Do something with the URI in $context_specific_text.
-        echo nop
+        # Do something with the URI in $context_specific_text. There is
+        # nothing meaningful that can be done by default.
+        true
         ;;
-    handle_current_uri)
-        # Do something with the URI in $current_uri.
-        echo nop
+    hid_button)
+        case "$key" in
+            2)  echo  go_hover_uri_new_tab  ;;
+            8)  echo  go_backward           ;;
+            9)  echo  go_forward            ;;
+        esac
+        ;;
+    hid_key)
+        case "$key" in
+            Escape)  echo  abort_load              ;;
+            M-3)     echo  search_backward         ;;
+            M-c)     echo  reload_user_certs       ;;
+            M-d)     echo  download_manager_open   ;;
+            M-D)     echo  download_manager_close  ;;
+            M-e)     echo  new_tab                 ;;
+            M-k)     echo  search_initiate         ;;
+            M-l)     echo  focus_input_box         ;;
+            M-n)     echo  search_forward          ;;
+            M-q)     echo  quit                    ;;
+            M-r)     echo  reload                  ;;
+            M-w)     echo  go_home                 ;;
+            *)       echo  nop                     ;;
+        esac
+        ;;
+    hid_scroll)
+        case "$key" in
+            C-y)      echo  zoom_increase  ;;
+            C-Y)      echo  zoom_decrease  ;;
+            C-x|C-X)  echo  zoom_reset     ;;
+        esac
         ;;
 esac
