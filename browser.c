@@ -79,6 +79,7 @@ static void hover_web_view(WebKitWebView *, WebKitHitTestResult *, guint, gpoint
 static gchar *human_event(GdkEvent *);
 static gboolean input_driver(struct Client *, gchar *, gchar *, const gchar *);
 static gboolean input_driver_context_menu(GtkAction *, gpointer);
+static gboolean input_driver_run(gchar *, struct Client *);
 static gboolean key_common(GtkWidget *, GdkEvent *, gpointer);
 static gboolean key_location(GtkWidget *, GdkEvent *, gpointer);
 static void load_command_hash(void);
@@ -145,10 +146,9 @@ client_new(const gchar *uri, WebKitWebView *related_wv, gboolean show)
 
     if (uri != NULL && cooperative_instances && !cooperative_alone)
     {
-        f = ensure_uri_scheme(uri);
-        write(cooperative_pipe_fp, f, strlen(f));
+        write(cooperative_pipe_fp, "go_uri_new_tab ", strlen("go_uri_new_tab "));
+        write(cooperative_pipe_fp, uri, strlen(uri));
         write(cooperative_pipe_fp, "\n", 1);
-        g_free(f);
         return NULL;
     }
 
@@ -927,12 +927,9 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     GIOChannel *child_stdout_channel;
     GError *err = NULL;
     gchar *output = NULL, *t_nc = NULL, *uri_nc = NULL;
-    gchar **tokens = NULL;
     gboolean handled = FALSE;
     char *argv[64] = {0};
     size_t argv_i = 0;
-    struct CommandArguments args = {0};
-    gboolean (*fn_ptr)(struct Client *, struct CommandArguments *a);
 
     /* All of this assumes that argv is big enough in the first place
      * and it must be pre-filled with zeroes. See its declaration. */
@@ -983,9 +980,37 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     }
     g_io_channel_read_line(child_stdout_channel, &output, NULL, NULL, NULL);
     g_io_channel_shutdown(child_stdout_channel, FALSE, NULL);
-    if (output != NULL)
+    handled = input_driver_run(output, c);
+
+    g_free(output);
+
+cleanout_nc:
+    g_free(uri_nc);
+    g_free(t_nc);
+
+    return handled;
+}
+
+gboolean
+input_driver_context_menu(GtkAction *action, gpointer data)
+{
+    struct Client *c = (struct Client *)data;
+
+    return input_driver(c, "handle_context_menu_uri", NULL,
+                        c->context_menu_uri);
+}
+
+gboolean
+input_driver_run(gchar *line, struct Client *c)
+{
+    gchar **tokens = NULL;
+    struct CommandArguments args = {0};
+    gboolean (*fn_ptr)(struct Client *, struct CommandArguments *a);
+    gboolean handled = FALSE;
+
+    if (line != NULL)
     {
-        tokens = g_strsplit(g_strstrip(output), " ", 2);
+        tokens = g_strsplit(g_strstrip(line), " ", 2);
         if (tokens[0] != NULL)
         {
             if (strncmp(tokens[0], "nop", 3) == 0)
@@ -1010,22 +1035,7 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     }
 
     g_strfreev(tokens);
-    g_free(output);
-
-cleanout_nc:
-    g_free(uri_nc);
-    g_free(t_nc);
-
     return handled;
-}
-
-gboolean
-input_driver_context_menu(GtkAction *action, gpointer data)
-{
-    struct Client *c = (struct Client *)data;
-
-    return input_driver(c, "handle_context_menu_uri", NULL,
-                        c->context_menu_uri);
 }
 
 gboolean
@@ -1194,15 +1204,11 @@ quit_if_nothing_active(void)
 gboolean
 remote_msg(GIOChannel *channel, GIOCondition condition, gpointer data)
 {
-    gchar *uri = NULL;
+    gchar *line = NULL;
 
-    g_io_channel_read_line(channel, &uri, NULL, NULL, NULL);
-    if (uri)
-    {
-        g_strstrip(uri);
-        client_new(uri, NULL, TRUE);
-        g_free(uri);
-    }
+    g_io_channel_read_line(channel, &line, NULL, NULL, NULL);
+    input_driver_run(line, NULL);
+
     return TRUE;
 }
 
