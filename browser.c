@@ -42,6 +42,7 @@ static WebKitWebView *client_new(const gchar *, WebKitWebView *, gboolean);
 static WebKitWebView *client_new_request(WebKitWebView *, WebKitNavigationAction *,
                                          gpointer);
 static gboolean command_abort_load(struct Client *, struct CommandArguments *);
+static gboolean command_close(struct Client *, struct CommandArguments *);
 static gboolean command_download_manager_close(struct Client *, struct CommandArguments *);
 static gboolean command_download_manager_open(struct Client *, struct CommandArguments *);
 static gboolean command_focus_input_box(struct Client *, struct CommandArguments *);
@@ -49,7 +50,6 @@ static gboolean command_go_backward(struct Client *, struct CommandArguments *);
 static gboolean command_go_forward(struct Client *, struct CommandArguments *);
 static gboolean command_go_uri_new_tab(struct Client *, struct CommandArguments *);
 static gboolean command_go_uri(struct Client *, struct CommandArguments *);
-static gboolean command_quit(struct Client *, struct CommandArguments *);
 static gboolean command_reload(struct Client *, struct CommandArguments *);
 static gboolean command_reload_user_certs(struct Client *, struct CommandArguments *);
 static gboolean command_search_backward(struct Client *, struct CommandArguments *);
@@ -280,6 +280,17 @@ command_abort_load(struct Client *c, struct CommandArguments *a)
 }
 
 gboolean
+command_close(struct Client *c, struct CommandArguments *a)
+{
+    if (c == NULL)
+        return FALSE;
+
+    gtk_widget_destroy(c->win);
+
+    return TRUE;
+}
+
+gboolean
 command_download_manager_close(struct Client *c, struct CommandArguments *a)
 {
     downloadmanager_delete(dm.win, NULL);
@@ -351,17 +362,6 @@ command_go_uri_new_tab(struct Client *c, struct CommandArguments *a)
     f = ensure_uri_scheme(a->string);
     client_new(f, NULL, TRUE);
     g_free(f);
-
-    return TRUE;
-}
-
-gboolean
-command_quit(struct Client *c, struct CommandArguments *a)
-{
-    if (c == NULL)
-        return FALSE;
-
-    gtk_widget_destroy(c->win);
 
     return TRUE;
 }
@@ -1093,6 +1093,7 @@ load_command_hash(void)
 {
     command_hash = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(command_hash, "abort_load", command_abort_load);
+    g_hash_table_insert(command_hash, "close", command_close);
     g_hash_table_insert(command_hash, "download_manager_close", command_download_manager_close);
     g_hash_table_insert(command_hash, "download_manager_open", command_download_manager_open);
     g_hash_table_insert(command_hash, "focus_input_box", command_focus_input_box);
@@ -1100,7 +1101,6 @@ load_command_hash(void)
     g_hash_table_insert(command_hash, "go_forward", command_go_forward);
     g_hash_table_insert(command_hash, "go_uri", command_go_uri);
     g_hash_table_insert(command_hash, "go_uri_new_tab", command_go_uri_new_tab);
-    g_hash_table_insert(command_hash, "quit", command_quit);
     g_hash_table_insert(command_hash, "reload_page", command_reload);
     g_hash_table_insert(command_hash, "reload_user_certs", command_reload_user_certs);
     g_hash_table_insert(command_hash, "search_backward", command_search_backward);

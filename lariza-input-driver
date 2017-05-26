@@ -69,7 +69,7 @@ case "$context" in
             M-k)     echo  search_initiate         ;;
             M-l)     echo  focus_input_box         ;;
             M-n)     echo  search_forward          ;;
-            M-q)     echo  quit                    ;;
+            M-q)     echo  close                   ;;
             M-r)     echo  reload_page             ;;
             M-w)     echo  go_uri "$home"          ;;
             M-x)
