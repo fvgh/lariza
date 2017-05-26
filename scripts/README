@@ -1,0 +1,5 @@
+This directory contains an example implementation of the input driver.
+It allows for basic web browsing.
+
+You are encouraged to and, to some degree, expected to tune these
+scripts or write your own implementation from scratch.
