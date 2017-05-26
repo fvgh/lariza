@@ -1,0 +1,21 @@
+#!/bin/sh
+
+text=$1
+text_key=${text%% *}
+text_value=${text#* }
+
+db=${XDG_CONFIG_HOME:-~/.config}/lariza/keywordsearch
+
+if test -r "$db"
+then
+    while read db_key db_pattern
+    do
+        if [ "$db_key" = "$text_key" ]
+        then
+            printf "go_uri $db_pattern\n" "$text_value"
+            exit 0
+        fi
+    done <"$db"
+fi
+
+echo go_uri "$text"
