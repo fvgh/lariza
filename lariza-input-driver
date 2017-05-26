@@ -56,6 +56,7 @@ case "$context" in
         esac
         ;;
     hid_key)
+        home=${LARIZA_HOME_URI:-about:blank}
         case "$key" in
             Escape)  echo  abort_load              ;;
             F2)      echo  go_backward             ;;
@@ -64,13 +65,13 @@ case "$context" in
             M-c)     echo  reload_user_certs       ;;
             M-d)     echo  download_manager_open   ;;
             M-D)     echo  download_manager_close  ;;
-            M-e)     echo  new_tab                 ;;
+            M-e)     echo  go_uri_new_tab "$home"  ;;
             M-k)     echo  search_initiate         ;;
             M-l)     echo  focus_input_box         ;;
             M-n)     echo  search_forward          ;;
             M-q)     echo  quit                    ;;
             M-r)     echo  reload_page             ;;
-            M-w)     echo  go_home                 ;;
+            M-w)     echo  go_uri "$home"          ;;
             M-x)
                 # Replicating the behaviour of lariza's former "external
                 # handler" could be done as follows:

@@ -47,10 +47,8 @@ static gboolean command_download_manager_open(struct Client *, struct CommandArg
 static gboolean command_focus_input_box(struct Client *, struct CommandArguments *);
 static gboolean command_go_backward(struct Client *, struct CommandArguments *);
 static gboolean command_go_forward(struct Client *, struct CommandArguments *);
-static gboolean command_go_home(struct Client *, struct CommandArguments *);
 static gboolean command_go_uri_new_tab(struct Client *, struct CommandArguments *);
 static gboolean command_go_uri(struct Client *, struct CommandArguments *);
-static gboolean command_new_tab(struct Client *, struct CommandArguments *);
 static gboolean command_quit(struct Client *, struct CommandArguments *);
 static gboolean command_reload(struct Client *, struct CommandArguments *);
 static gboolean command_reload_user_certs(struct Client *, struct CommandArguments *);
@@ -105,7 +103,6 @@ static Window embed = 0;
 static gchar *fifo_suffix = "main";
 static gdouble global_zoom = 1.0;
 static gchar *history_file = NULL;
-static gchar *home_uri = "about:blank";
 static gboolean initial_wc_setup_done = FALSE;
 static gchar *search_prefix = ":/";
 static gchar *search_text = NULL;
@@ -332,21 +329,6 @@ command_go_forward(struct Client *c, struct CommandArguments *a)
 }
 
 gboolean
-command_go_home(struct Client *c, struct CommandArguments *a)
-{
-    gchar *f;
-
-    if (c == NULL)
-        return FALSE;
-
-    f = ensure_uri_scheme(home_uri);
-    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
-    g_free(f);
-
-    return TRUE;
-}
-
-gboolean
 command_go_uri(struct Client *c, struct CommandArguments *a)
 {
     gchar *f;
@@ -367,18 +349,6 @@ command_go_uri_new_tab(struct Client *c, struct CommandArguments *a)
     gchar *f;
 
     f = ensure_uri_scheme(a->string);
-    client_new(f, NULL, TRUE);
-    g_free(f);
-
-    return TRUE;
-}
-
-gboolean
-command_new_tab(struct Client *c, struct CommandArguments *a)
-{
-    gchar *f;
-
-    f = ensure_uri_scheme(home_uri);
     client_new(f, NULL, TRUE);
     g_free(f);
 
@@ -835,10 +805,6 @@ grab_environment_configuration(void)
     if (e != NULL)
         history_file = g_strdup(e);
 
-    e = g_getenv(__NAME_UPPERCASE__"_HOME_URI");
-    if (e != NULL)
-        home_uri = g_strdup(e);
-
     e = g_getenv(__NAME_UPPERCASE__"_SEARCH_PREFIX");
     if (e != NULL)
         search_prefix = g_strdup(e);
@@ -1132,10 +1098,8 @@ load_command_hash(void)
     g_hash_table_insert(command_hash, "focus_input_box", command_focus_input_box);
     g_hash_table_insert(command_hash, "go_backward", command_go_backward);
     g_hash_table_insert(command_hash, "go_forward", command_go_forward);
-    g_hash_table_insert(command_hash, "go_home", command_go_home);
     g_hash_table_insert(command_hash, "go_uri", command_go_uri);
     g_hash_table_insert(command_hash, "go_uri_new_tab", command_go_uri_new_tab);
-    g_hash_table_insert(command_hash, "new_tab", command_new_tab);
     g_hash_table_insert(command_hash, "quit", command_quit);
     g_hash_table_insert(command_hash, "reload_page", command_reload);
     g_hash_table_insert(command_hash, "reload_user_certs", command_reload_user_certs);
@@ -1367,7 +1331,7 @@ main(int argc, char **argv)
     }
 
     if (optind >= argc)
-        client_new(home_uri, NULL, TRUE);
+        client_new("about:blank", NULL, TRUE);
     else
     {
         for (i = optind; i < argc; i++)
