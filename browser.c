@@ -349,7 +349,7 @@ command_go_uri(struct Client *c, struct CommandArguments *a)
 {
     gchar *f;
 
-    if (c == NULL)
+    if (c == NULL || a == NULL || a->string == NULL)
         return FALSE;
 
     f = ensure_uri_scheme(a->string);
@@ -363,6 +363,9 @@ gboolean
 command_go_uri_new_tab(struct Client *c, struct CommandArguments *a)
 {
     gchar *f;
+
+    if (a == NULL || a->string == NULL)
+        return FALSE;
 
     f = ensure_uri_scheme(a->string);
     client_new(f, NULL, TRUE);
