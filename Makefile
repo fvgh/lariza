@@ -37,8 +37,6 @@ we_adblock.so: we_adblock.c
 
 install: all installdirs
 	$(INSTALL_PROGRAM) $(__NAME__) $(DESTDIR)$(bindir)/$(__NAME__)
-	$(INSTALL_PROGRAM) scripts/$(__NAME__)-external-handler \
-		$(DESTDIR)$(bindir)/$(__NAME__)-external-handler
 	$(INSTALL_PROGRAM) scripts/$(__NAME__)-input-driver \
 		$(DESTDIR)$(bindir)/$(__NAME__)-input-driver
 	$(INSTALL_PROGRAM) scripts/$(__NAME__)-keyword-search \

@@ -35,7 +35,10 @@ execute()
         handle_context_menu_uri)
             # Do something with the URI in $context_specific_text.
             # Replicating the behaviour of lariza's former "external
-            # handler" could be done as follows:
+            # handler" could be done as follows. Please note that this
+            # "external handler" always was a pure user-supplied
+            # implementation, which is why we don't provide an example
+            # today. It's totally up to you.
             lariza-external-handler -u "$context_specific_text" \
                 </dev/null >/dev/null &
             echo nop
