@@ -42,9 +42,9 @@ execute()
             ;;
         hid_button)
             case "$key" in
-                2)  [ -n "$hover_uri" ] && echo go_uri_new_tab "$hover_uri" ;;
-                8)  echo  go_backward           ;;
-                9)  echo  go_forward            ;;
+                2)  [ -n "$hover_uri" ] && echo go_uri_new_tab "$hover_uri"  ;;
+                8)  echo  go_backward  ;;
+                9)  echo  go_forward   ;;
             esac
             ;;
         hid_key)
