@@ -76,6 +76,10 @@ positive x direction, same thing with \fBy\fP and \fBY\fP. Modifiers can
 be present as well. (Note: Currently, modifiers \fBmust\fP be pressed
 for any \fBhid_scroll\fP events to be reported.)
 .P
+Note that \fBhid_*\fP events are always reported when a key or button
+has been pressed. The input driver won't be notified about release
+events.
+.P
 After all required variables have been transferred, \fBlariza\fP will
 send a single line containing the word \fBexecute\fP.
 .P
