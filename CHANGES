@@ -1,6 +1,11 @@
 Release history for lariza
 
 next
+  [Fixed]
+  - User input is now properly escaped when used for keyword based
+    searching (fixes #47) (in the example implementation of the input
+    driver, see below).
+
   [Changed]
   - This is going to be a "big" release that will rework handling of
     user input.
