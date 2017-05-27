@@ -4,12 +4,10 @@ next
   [Changed]
   - This is going to be a "big" release that will rework handling of
     user input.
-  - All text entered by the user into lariza's input box will be fed
-    through a script called "the input driver" (except for searching the
-    current web page). This allows for a great deal of user
-    customization without having to touch the core program.
-  - As a consequence, "keyword based searching" has been removed from
-    core. This must now be implemented in the input driver.
+  - All text entered by the user into lariza's input box as well as all
+    key strokes will be fed through a script called "the input driver".
+    This allows for a great deal of user customization without having to
+    touch the core program.
   - The former "external handler" is a special case of the input driver.
 
 v17.05  2017-05-21

@@ -7,6 +7,150 @@ lariza.usage \- extended usage hints
 \fBlariza\fP is a simple web browser using GTK+ 3, GLib and WebKit2GTK+.
 This manpage contains additional hints and pointers regarding its usage.
 .\" --------------------------------------------------------------------
+.SH "INPUT DRIVER"
+\fBlariza\fP hardly evaluates any user input. Instead, user input is fed
+through a user-supplied script called \(lqthe input driver\(rq. Its file
+name is \fBlariza\-input\-driver\fP and it must be located somewhere in
+your $\fBPATH\fP.
+.P
+An exemplary implementation is provided by \fBlariza\fP, but the point
+of this script is to allow for user customization. In other words, it's
+your job to extend or rewrite the default implementation.
+.P
+The browser automatically launches the input driver script when needed.
+Pipes are established between the browser and the script. The browser
+will first send some variables to the script's \fBstdin\fP. This is done
+by sending a line containing the name of the variable, followed by
+another line which contains the variable's value. Valid variable names:
+.TP
+\fBcontext\fP
+The most important one. It indicates the type of event that the input
+driver is supposed to handle. See below for a list of all values.
+.TP
+\fBcontext_specific_text\fP
+The meaning of this string depends on the context it's being used in.
+Only present for some contexts, see below.
+.TP
+\fBcurrent_uri\fP
+The URI currently shown in the WebKit viewport associated with this
+event. Not present if the event originated from the download manager
+window.
+.TP
+\fBhover_uri\fP
+If the mouse cursor is currently hovering over some hyperlink, this
+variable will be set to that link.
+.TP
+\fBkey\fP
+A key as pressed by the user. This is one of the symbols defined in
+\fIgdk/gdkkeysyms.h\fP, minus the leading \fBGDK_KEY_\fP part. If
+modifier keys have been pressed as well, there will be an additional
+\fBC\-\fP (indicating Control), an \fBM\-\fP (indicating Mod1) and/or an
+\fBS\-\fP (indicating Super), in that order. For example, if the user
+pressed \fBControl + Mod1 + x\fP, the script would receive \fBC-M-x\fP.
+.P
+Currently supported context strings:
+.TP
+\fBinputbox\fP
+The user has entered some text into the input box and now your script
+must be decide what to do with it. This is the point where you usually
+implement features like keyword based searching.
+\fIcontext_specific_text\fP will be set to the text of the input box.
+.TP
+\fBhandle_context_menu_uri\fP
+The user has issued a right-click on some link or some media file and he
+has then selected the item \(lqopen in external handler\(rq. This will
+set \fIcontext_specific_text\fP to the URI under the mouse pointer.
+.TP
+\fBhid_button\fP
+A mouse button has been pressed. \fBkey\fP will indicate the number of
+the mouse button, plus modifiers.
+.TP
+\fBhid_key\fP
+A key on a keyboard has been pressed. \fBkey\fP indicates which one and
+which modifiers.
+.TP
+\fBhid_scroll\fP
+Some scroll event (mouse wheel, touch pad, ...) has happened. \fBkey\fP
+indicates the direction: \fBx\fP for negative x direction, \fBX\fP for
+positive x direction, same thing with \fBy\fP and \fBY\fP. Modifiers can
+be present as well. (Note: Currently, modifiers \fBmust\fP be pressed
+for any \fBhid_scroll\fP events to be reported.)
+.P
+After all required variables have been transferred, \fBlariza\fP will
+send a single line containing the word \fBexecute\fP.
+.P
+The input driver must now decide what to do and communicate back to the
+browser. It does so by writing a line to its \fBstdout\fP. Note that
+\fBlariza\fP will block until that line has been read. You can use the
+following commands:
+.TP
+\fBabort_load\fP
+Abort the current loading operation (only applies to WebKit viewports,
+not to the download manager).
+.TP
+\fBclose\fP
+Close the window which was the origin of this event.
+.TP
+\fBdownload_manager_close\fP
+Close the download manager.
+.TP
+\fBdownload_manager_open\fP
+Close the download manager.
+.TP
+\fBfocus_input_box\fP
+Jump to input box and select all text.
+.TP
+\fBgo_backward\fP
+Go backward in browsing history.
+.TP
+\fBgo_forward\fP
+Go forward in browsing history.
+.TP
+\fBgo_uri\fP \fIURI\fP
+Open the given URI in the window which was the origin of this event.
+.TP
+\fBgo_uri_new_tab\fP \fIURI\fP
+Open the given URI in a new tab/window.
+.TP
+\fBreload_page\fP
+Reload page in the window which was the origin of this event. Always
+bypasses all caches.
+.TP
+\fBreload_user_certs\fP
+Reload trusted user certificates. See section below.
+.TP
+\fBsearch_backward\fP
+If a search has already been initiated, re-search backward.
+.TP
+\fBsearch_forward\fP
+If a search has already been initiated, re-search forward.
+.TP
+\fBsearch_initiate\fP
+Jump to input box and pre-populate it with $\fBLARIZA_SEARCH_PREFIX\fP,
+thus allowing to easily initiate a new search.
+.TP
+\fBzoom_decrease\fP
+Decrease zoom level in the window which was the origin of this event.
+.TP
+\fBzoom_increase\fP
+Increase zoom level in the window which was the origin of this event.
+.TP
+\fBzoom_reset\fP
+Reset zoom level to $\fBLARIZA_ZOOM\fP.
+.P
+Special commands are:
+.TP
+\fBnop\fP
+Use \fBnop\fP to indicate that your input driver has indeed handled the
+event, but \fBlariza\fP shall perform no further action.
+.TP
+\fBunknown\fP
+If your input driver does not know how to handle the event, it must
+still print a response. Use \fBunknown\fP to indicate that the event
+shall be propagated to WebKit and Gtk.
+.P
+\fBlariza\fP ignores the exit code of the input driver.
+.\" --------------------------------------------------------------------
 .SH "BUNDLED WEB EXTENSIONS"
 On startup, WebKit checks \fI~/.local/share/lariza/web_extensions\fP for
 any \fB.so\fP files. See
@@ -41,145 +185,6 @@ There's no file manager integration, nor does \fBlariza\fP delete,
 overwrite or resume downloads. If a file already exists, it won't be
 touched. Instead, the new file name will have a suffix such as \fB.1\fP,
 \fB.2\fP, \fB.3\fP, and so on.
-.\" --------------------------------------------------------------------
-.SH "HOTKEYS"
-.SS "Global hotkeys"
-These hotkeys work when either the location bar or the web view is being
-focused.
-.TP
-\fBMod1\fP + \fBx\fP
-Launch the input driver for the currently loaded URI (context
-\fBhandle_current_uri\fP).
-.TP
-\fBMod1\fP + \fBq\fP
-Close the current window. Quits the entire program if this was the last
-window and if there are no more active downloads (download manager is
-shown otherwise).
-.TP
-\fBMod1\fP + \fBw\fP
-Go to your \(lqhomepage\(rq. See the environment variable
-$\fBLARIZA_HOME_URI\fP.
-.TP
-\fBMod1\fP + \fBe\fP
-Open a new window.
-.TP
-\fBMod1\fP + \fBr\fP
-Reload the current page.
-.TP
-\fBMod1\fP + \fBd\fP
-Open the download manager.
-.TP
-\fBMod1\fP + \fBl\fP
-Focus the location bar.
-.TP
-\fBMod1\fP + \fBk\fP
-Focus the location bar and set its text to $\fBLARIZA_SEARCH_PREFIX\fP
-(defaults to \fB:/\fP), allowing you to easily initiate a search.
-.TP
-\fBMod1\fP + \fB2\fP
-.TQ
-\fBMod1\fP + \fBn\fP
-Repeat the last search (forward).
-.TP
-\fBMod1\fP + \fB3\fP
-Repeat the last search (backward).
-.TP
-\fBMod1\fP + \fBc\fP
-Reload trusted certificates.
-.TP
-\fBF2\fP / \fBF3\fP
-Go backward and forward in current browser history.
-.P
-.SS "Main window \(em WebKit viewport focused"
-.TP
-\fBEscape\fP
-Stop loading.
-.TP
-\fBMiddle mouse\fP
-Open the link under the pointer in a new window.
-.TP
-\fBBackward\fP / \fBforward\fP (mouse keys 8 and 9)
-Same as \fBF2\fP and \fBF3\fP.
-.TP
-\fBMod1\fP + \fBScroll up\fP
-.TQ
-\fBCtrl\fP + \fBScroll up\fP
-Increase zoom level of the current page.
-.TP
-\fBMod1\fP + \fBScroll down\fP
-.TQ
-\fBCtrl\fP + \fBScroll down\fP
-Decrase zoom level of the current page.
-.TP
-\fBMod1\fP + \fBScroll horizontally\fP
-.TQ
-\fBCtrl\fP + \fBScroll horizontally\fP
-Reset zoom to $\fBLARIZA_ZOOM\fP.
-.P
-.SS "Main window \(em location bar focused"
-.TP
-\fBEscape\fP
-Reset the content of the location bar to the current URI.
-.TP
-\fBReturn\fP
-Commit, i.e. begin searching, do a keyword based search or open the URI.
-.P
-.SS "Download manager"
-.TP
-\fBMod1\fP + \fBd\fP
-.TQ
-\fBMod1\fP + \fBq\fP
-Close the download manager. Active downloads are never aborted. However,
-if there are no more active downloads and no more browsing windows, then
-the entire program will quit.
-.\" --------------------------------------------------------------------
-.SH "INPUT DRIVER"
-All text entered into \fBlariza\fP's input box will be fed through a
-user supplied script (except when searching the current web page). That
-script is called \(lqthe input driver\(rq. Its file name is
-\fBlariza\-input\-driver\fP and it must be located somewhere in your
-$\fBPATH\fP.
-.P
-An exemplary implementation is provided by \fBlariza\fP, but the point
-of this script is to allow for user customization. In other words, it's
-your job to extend or rewrite the default implementation.
-.P
-The input driver will always be called with these two parameters:
-\fB\-c\fP \fIcontext\fP \fB\-u\fP \fIcurrent_uri\fP. \fIcontext\fP is
-one of the strings below. Additionally, in some contexts, \fB\-t\fP
-\fIcontext_specific_text\fP will be set.
-.P
-Currently supported context strings:
-.TP
-\fBinputbox\fP
-This is the most common case. The user has entered some text into the
-input box and now your script must be decide what to do with it. This is
-the point where you usually implement features like keyword based
-searching. \fIcontext_specific_text\fP will be set to the text entered.
-.TP
-\fBhandle_context_menu_uri\fP
-The user has issued a right-click on some link or some media file and he
-has then selected the item \(lqopen in external handler\(rq. This will
-set \fIcontext_specific_text\fP to the URI under the mouse pointer.
-.TP
-\fBhandle_current_uri\fP
-The user has hit the hotkey for \(lqopen current URI with input
-handler\(rq (\fBMod1\fP + \fBx\fP).
-.P
-The input driver must communicate back to the browser. It does so by
-writing a line to its \fBstdout\fP. Note that \fBlariza\fP will block
-until that line has been read. You can use the following commands:
-.TP
-\fBgo_uri\fP \fIURI\fP
-Open \fIURI\fP in the window from where the input driver was launched.
-.TP
-\fBgo_uri\fP \fIURI\fP
-Open \fIURI\fP in a new window.
-.TP
-\fBnop\fP
-Do nothing.
-.P
-\fBlariza\fP ignores the exit code of the input driver.
 .\" --------------------------------------------------------------------
 .SH "TRUSTED CERTIFICATES"
 By default, \fBlariza\fP trusts whatever CAs are trusted by WebKit, i.e. by

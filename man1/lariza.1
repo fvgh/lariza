@@ -28,7 +28,7 @@ Disables cooperative instances.
 Disables automatic launching of suckless' \fBtabbed\fP(1).
 .P
 After these options there can be any number of URIs. If no URIs are
-given, $\fBLARIZA_HOME_URI\fP will be opened.
+given, \fBabout:blank\fP will be opened.
 .\" --------------------------------------------------------------------
 .SH ENVIRONMENT
 In addition to the standard variables of GTK+ 3, \fBlariza\fP knows
@@ -71,11 +71,6 @@ independent cooperative instances of \fBlariza\fP.
 If set, \fBlariza\fP will write each visited URI to that file. This path
 can point to a named pipe, but be aware that the browser will block
 until a reader at the other end of the pipe has read all pending data.
-.TP
-\fBLARIZA_HOME_URI\fP
-This URI will be opened by pressing the appropriate hotkeys
-(\(lqhomepage\(rq or \(lqnew window\(rq) and if no URIs are specified on
-the command line. Defaults to \fBabout:blank\fP.
 .TP
 \fBLARIZA_SEARCH_PREFIX\fP
 If you want to search for text on a web page, you have to enter this
