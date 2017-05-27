@@ -85,10 +85,17 @@ execute()
 
 main_loop()
 {
-    # For performance reasons, the input driver is usually spawned only
-    # once. It will be fed a series of commands, passing context from
-    # lariza to this script. Eventually, lariza sends "execute" and then
-    # it's our job to tell lariza what to do.
+    # lariza spawns this script. There's a pipe between the browser and
+    # this script. Commands are sent from the browser to us: They tell
+    # us what context we're in (key press, text entered into the input
+    # box, and so on). Eventually, the browser sends "execute". We must
+    # then evaluate all the variables we've been given and decide what
+    # to do. Our stdout is connected to a pipe as well, so that's where
+    # we write our response to.
+    #
+    # For performance reasons, we can and should not exit after
+    # "execute" has been received. The browser will continue to send us
+    # new events as long as we're still alive.
     while read -r command
     do
         case "$command" in
