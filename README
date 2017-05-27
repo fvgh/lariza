@@ -7,8 +7,7 @@ A simple web browser using GTK+ 3, GLib and WebKit2GTK+.
 
 Features:
 
-    - A WebKit2 viewport
-    - An input box to change the URI or to search the current page
+    - A WebKit2 viewport, an input box, and a progress bar
     - User input is handled by user-supplied scripts
     - Built-in launching of suckless' tabbed
     - Built-in download manager
