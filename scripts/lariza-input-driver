@@ -30,6 +30,9 @@ execute()
             # The variable $context_specific_text contains the text
             # entered by the user. You could inspect it further to
             # implement key word based searching or other features.
+            #
+            # Note that we redirect stdin here. Child processes must not
+            # ever read from our stdin since that is the command pipe.
             lariza-keyword-search "$context_specific_text" </dev/null
             ;;
         handle_context_menu_uri)
@@ -39,6 +42,11 @@ execute()
             # "external handler" always was a pure user-supplied
             # implementation, which is why we don't provide an example
             # today. It's totally up to you.
+            #
+            # Note that we redirect stdout here as well, because this is
+            # an unrelated child process. It should not be able to
+            # answer directly to lariza (nor should it be able to read
+            # from the command pipe, so stdin is redirected as well).
             lariza-external-handler -u "$context_specific_text" \
                 </dev/null >/dev/null &
             echo nop
