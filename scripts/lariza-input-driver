@@ -30,13 +30,14 @@ execute()
             # The variable $context_specific_text contains the text
             # entered by the user. You could inspect it further to
             # implement key word based searching or other features.
-            lariza-keyword-search "$context_specific_text"
+            lariza-keyword-search "$context_specific_text" </dev/null
             ;;
         handle_context_menu_uri)
             # Do something with the URI in $context_specific_text.
             # Replicating the behaviour of lariza's former "external
             # handler" could be done as follows:
-            lariza-external-handler -u "$context_specific_text" &
+            lariza-external-handler -u "$context_specific_text" \
+                </dev/null >/dev/null &
             echo nop
             ;;
         hid_button)
@@ -66,7 +67,8 @@ execute()
                 M-x)
                     # Replicating the behaviour of lariza's former
                     # "external handler" could be done as follows:
-                    lariza-external-handler -u "$current_uri" &
+                    lariza-external-handler -u "$current_uri" \
+                        </dev/null >/dev/null &
                     echo nop
                     ;;
             esac
