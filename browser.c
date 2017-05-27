@@ -889,7 +889,7 @@ human_event(GdkEvent *event)
 gboolean
 input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
 {
-    gint child_stdout;
+    gint child_stdin, child_stdout;
     GIOChannel *child_stdout_channel;
     GError *err = NULL;
     gchar *output = NULL, *t_nc = NULL, *uri_nc = NULL;
@@ -911,10 +911,7 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     }
 
     if (key != NULL)
-    {
         argv[argv_i++] = "-k";
-        argv[argv_i++] = key;
-    }
 
     if (t != NULL)
     {
@@ -930,13 +927,20 @@ input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
     }
 
     if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL,
-                                  NULL, NULL, NULL, &child_stdout, NULL,
+                                  NULL, NULL, &child_stdin, &child_stdout, NULL,
                                   &err))
     {
         fprintf(stderr, __NAME__": Fatal: Could not launch input driver: %s\n", err->message);
         g_error_free(err);
         goto cleanout_nc;
     }
+
+    if (key != NULL)
+    {
+        write(child_stdin, key, strlen(key));
+        write(child_stdin, "\n", 1);
+    }
+    close(child_stdin);
 
     child_stdout_channel = g_io_channel_unix_new(child_stdout);
     if (child_stdout_channel == NULL)

@@ -23,12 +23,12 @@ then
     exec "$per_user_driver" "$@"
 fi
 
-while getopts c:h:k:t:u: name
+while getopts c:h:kt:u: name
 do
     case $name in
         c) context=$OPTARG ;;
         h) hover_uri=$OPTARG ;;
-        k) key=$OPTARG ;;
+        k) read -r key ;;
         t) context_specific_text=$OPTARG ;;
         u) current_uri=$OPTARG ;;
     esac
