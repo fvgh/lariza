@@ -1022,6 +1022,8 @@ input_driver_run_if_needed(void)
         if (indriv_stdin != -1)
             close(indriv_stdin);
 
+        fprintf(stderr, __NAME__": Launching new input driver\n");
+
         /* Spawn new child with new resources. */
         flags = G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_SEARCH_PATH;
         if (!g_spawn_async_with_pipes(NULL, argv, NULL, flags, NULL, NULL,
