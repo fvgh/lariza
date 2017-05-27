@@ -23,68 +23,83 @@ then
     exec "$per_user_driver" "$@"
 fi
 
-while getopts c:h:kt:u: name
-do
-    case $name in
-        c) context=$OPTARG ;;
-        h) hover_uri=$OPTARG ;;
-        k) read -r key ;;
-        t) context_specific_text=$OPTARG ;;
-        u) current_uri=$OPTARG ;;
+execute()
+{
+    case "$context" in
+        inputbox)
+            # The variable $context_specific_text contains the text
+            # entered by the user. You could inspect it further to
+            # implement key word based searching or other features.
+            lariza-keyword-search "$context_specific_text"
+            ;;
+        handle_context_menu_uri)
+            # Do something with the URI in $context_specific_text.
+            # Replicating the behaviour of lariza's former "external
+            # handler" could be done as follows:
+            lariza-external-handler -u "$context_specific_text" &
+            echo nop
+            ;;
+        hid_button)
+            case "$key" in
+                2)  [ -n "$hover_uri" ] && echo go_uri_new_tab "$hover_uri" ;;
+                8)  echo  go_backward           ;;
+                9)  echo  go_forward            ;;
+            esac
+            ;;
+        hid_key)
+            home=${LARIZA_HOME_URI:-about:blank}
+            case "$key" in
+                Escape)  echo  abort_load              ;;
+                F2)      echo  go_backward             ;;
+                F3)      echo  go_forward              ;;
+                M-3)     echo  search_backward         ;;
+                M-c)     echo  reload_user_certs       ;;
+                M-d)     echo  download_manager_open   ;;
+                M-D)     echo  download_manager_close  ;;
+                M-e)     echo  go_uri_new_tab "$home"  ;;
+                M-k)     echo  search_initiate         ;;
+                M-l)     echo  focus_input_box         ;;
+                M-n)     echo  search_forward          ;;
+                M-q)     echo  close                   ;;
+                M-r)     echo  reload_page             ;;
+                M-w)     echo  go_uri "$home"          ;;
+                M-x)
+                    # Replicating the behaviour of lariza's former
+                    # "external handler" could be done as follows:
+                    lariza-external-handler -u "$current_uri" &
+                    echo nop
+                    ;;
+            esac
+            ;;
+        hid_scroll)
+            case "$key" in
+                M-y)      echo  zoom_increase  ;;
+                M-Y)      echo  zoom_decrease  ;;
+                M-x|M-X)  echo  zoom_reset     ;;
+            esac
+            ;;
     esac
-done
+}
 
-case "$context" in
-    inputbox)
-        # The variable $context_specific_text contains the text entered
-        # by the user. You could inspect it further to implement key
-        # word based searching or other features.
-        lariza-keyword-search "$context_specific_text"
-        ;;
-    handle_context_menu_uri)
-        # Do something with the URI in $context_specific_text.
-        # Replicating the behaviour of lariza's former "external
-        # handler" could be done as follows:
-        lariza-external-handler -u "$context_specific_text" &
-        echo nop
-        ;;
-    hid_button)
-        case "$key" in
-            2)  [ -n "$hover_uri" ] && echo go_uri_new_tab "$hover_uri" ;;
-            8)  echo  go_backward           ;;
-            9)  echo  go_forward            ;;
-        esac
-        ;;
-    hid_key)
-        home=${LARIZA_HOME_URI:-about:blank}
-        case "$key" in
-            Escape)  echo  abort_load              ;;
-            F2)      echo  go_backward             ;;
-            F3)      echo  go_forward              ;;
-            M-3)     echo  search_backward         ;;
-            M-c)     echo  reload_user_certs       ;;
-            M-d)     echo  download_manager_open   ;;
-            M-D)     echo  download_manager_close  ;;
-            M-e)     echo  go_uri_new_tab "$home"  ;;
-            M-k)     echo  search_initiate         ;;
-            M-l)     echo  focus_input_box         ;;
-            M-n)     echo  search_forward          ;;
-            M-q)     echo  close                   ;;
-            M-r)     echo  reload_page             ;;
-            M-w)     echo  go_uri "$home"          ;;
-            M-x)
-                # Replicating the behaviour of lariza's former "external
-                # handler" could be done as follows:
-                lariza-external-handler -u "$current_uri" &
-                echo nop
+main_loop()
+{
+    # For performance reasons, the input driver is usually spawned only
+    # once. It will be fed a series of commands, passing context from
+    # lariza to this script. Eventually, lariza sends "execute" and then
+    # it's our job to tell lariza what to do.
+    while read -r command
+    do
+        case "$command" in
+            context|context_specific_text|current_uri|hover_uri|key)
+                read -r "$command"
+                ;;
+            execute)
+                res=$(execute)
+                echo "${res:-unknown}"
+                unset context context_specific_text current_uri hover_uri key
                 ;;
         esac
-        ;;
-    hid_scroll)
-        case "$key" in
-            M-y)      echo  zoom_increase  ;;
-            M-Y)      echo  zoom_decrease  ;;
-            M-x|M-X)  echo  zoom_reset     ;;
-        esac
-        ;;
-esac
+    done
+}
+
+main_loop

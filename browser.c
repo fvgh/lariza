@@ -1,15 +1,16 @@
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
-#include <gtk/gtk.h>
-#include <gtk/gtkx.h>
 #include <gdk/gdkkeysyms.h>
 #include <gio/gio.h>
+#include <gtk/gtk.h>
+#include <gtk/gtkx.h>
 #include <webkit2/webkit2.h>
 
 
@@ -77,7 +78,8 @@ static void hover_web_view(WebKitWebView *, WebKitHitTestResult *, guint, gpoint
 static gchar *human_event(GdkEvent *);
 static gboolean input_driver(struct Client *, gchar *, gchar *, const gchar *);
 static gboolean input_driver_context_menu(GtkAction *, gpointer);
-static gboolean input_driver_run(gchar *, struct Client *);
+static gboolean input_driver_execute_command(gchar *, struct Client *);
+static gboolean input_driver_run_if_needed(void);
 static gboolean key_common(GtkWidget *, GdkEvent *, gpointer);
 static gboolean key_location(GtkWidget *, GdkEvent *, gpointer);
 static void load_command_hash(void);
@@ -103,6 +105,9 @@ static Window embed = 0;
 static gchar *fifo_suffix = "main";
 static gdouble global_zoom = 1.0;
 static gchar *history_file = NULL;
+static GPid indriv_pid = -1;
+static gint indriv_stdin = -1;
+static GIOChannel *indriv_stdout_channel = NULL;
 static gboolean initial_wc_setup_done = FALSE;
 static gchar *search_prefix = ":/";
 static gchar *search_text = NULL;
@@ -889,74 +894,54 @@ human_event(GdkEvent *event)
 gboolean
 input_driver(struct Client *c, gchar *context, gchar *key, const gchar *t)
 {
-    gint child_stdin, child_stdout;
-    GIOChannel *child_stdout_channel;
-    GError *err = NULL;
-    gchar *output = NULL, *t_nc = NULL, *uri_nc = NULL;
+    gchar *output = NULL, *uri_nc = NULL;
     gboolean handled = FALSE;
-    char *argv[64] = {0};
-    size_t argv_i = 0;
 
-    /* All of this assumes that argv is big enough in the first place
-     * and it must be pre-filled with zeroes. See its declaration. */
-    argv[argv_i++] = "lariza-input-driver";
-    argv[argv_i++] = "-c";
-    argv[argv_i++] = context;
+    if (!input_driver_run_if_needed())
+    {
+        fprintf(stderr, __NAME__": Fatal: Input driver not running\n");
+        return FALSE;
+    }
+
+    write(indriv_stdin, "context\n", strlen("context\n"));
+    write(indriv_stdin, context, strlen(context));
+    write(indriv_stdin, "\n", 1);
+
+    if (t != NULL)
+    {
+        write(indriv_stdin, "context_specific_text\n", strlen("context_specific_text\n"));
+        write(indriv_stdin, t, strlen(t));
+        write(indriv_stdin, "\n", 1);
+    }
 
     if (c != NULL)
     {
         uri_nc = g_strdup(webkit_web_view_get_uri(WEBKIT_WEB_VIEW(c->web_view)));
-        argv[argv_i++] = "-u";
-        argv[argv_i++] = uri_nc;
+        write(indriv_stdin, "current_uri\n", strlen("current_uri\n"));
+        write(indriv_stdin, uri_nc, strlen(uri_nc));
+        write(indriv_stdin, "\n", 1);
+        g_free(uri_nc);
     }
 
     if (key != NULL)
-        argv[argv_i++] = "-k";
-
-    if (t != NULL)
     {
-        t_nc = g_strdup(t);
-        argv[argv_i++] = "-t";
-        argv[argv_i++] = t_nc;
+        write(indriv_stdin, "key\n", strlen("key\n"));
+        write(indriv_stdin, key, strlen(key));
+        write(indriv_stdin, "\n", 1);
     }
 
     if (c != NULL && c->hover_uri != NULL)
     {
-        argv[argv_i++] = "-h";
-        argv[argv_i++] = c->hover_uri;
+        write(indriv_stdin, "hover_uri\n", strlen("hover_uri\n"));
+        write(indriv_stdin, c->hover_uri, strlen(c->hover_uri));
+        write(indriv_stdin, "\n", 1);
     }
 
-    if (!g_spawn_async_with_pipes(NULL, argv, NULL, G_SPAWN_SEARCH_PATH, NULL,
-                                  NULL, NULL, &child_stdin, &child_stdout, NULL,
-                                  &err))
-    {
-        fprintf(stderr, __NAME__": Fatal: Could not launch input driver: %s\n", err->message);
-        g_error_free(err);
-        goto cleanout_nc;
-    }
+    write(indriv_stdin, "execute\n", strlen("execute\n"));
 
-    if (key != NULL)
-    {
-        write(child_stdin, key, strlen(key));
-        write(child_stdin, "\n", 1);
-    }
-    close(child_stdin);
-
-    child_stdout_channel = g_io_channel_unix_new(child_stdout);
-    if (child_stdout_channel == NULL)
-    {
-        fprintf(stderr, __NAME__": Fatal: Could open child's stdout\n");
-        goto cleanout_nc;
-    }
-    g_io_channel_read_line(child_stdout_channel, &output, NULL, NULL, NULL);
-    g_io_channel_shutdown(child_stdout_channel, FALSE, NULL);
-    handled = input_driver_run(output, c);
-
+    g_io_channel_read_line(indriv_stdout_channel, &output, NULL, NULL, NULL);
+    handled = input_driver_execute_command(output, c);
     g_free(output);
-
-cleanout_nc:
-    g_free(uri_nc);
-    g_free(t_nc);
 
     return handled;
 }
@@ -971,7 +956,7 @@ input_driver_context_menu(GtkAction *action, gpointer data)
 }
 
 gboolean
-input_driver_run(gchar *line, struct Client *c)
+input_driver_execute_command(gchar *line, struct Client *c)
 {
     gchar **tokens = NULL;
     struct CommandArguments args = {0};
@@ -1006,6 +991,54 @@ input_driver_run(gchar *line, struct Client *c)
 
     g_strfreev(tokens);
     return handled;
+}
+
+gboolean
+input_driver_run_if_needed(void)
+{
+    gint child_stdout;
+    GError *err = NULL;
+    GSpawnFlags flags;
+    char *argv[] = { "lariza-input-driver", NULL };
+
+    /* Launch new process if needed. Note that it's perfectly valid for
+     * input drivers to quit after each request, even though they
+     * *SHOULD* not do that for performance reasons.
+     *
+     * Anyway, we have to check if the process is still alive. It's not
+     * a fatal error if it isn't because it might have simply crashed:
+     * It's a user-supplied script and users are expected to hack on
+     * that script, so that's just fine. */
+
+    if (indriv_pid == -1 || waitpid(indriv_pid, NULL, WNOHANG) > 0)
+    {
+        /* Clean up previous resources. */
+        if (indriv_stdout_channel != NULL)
+            g_io_channel_shutdown(indriv_stdout_channel, FALSE, NULL);
+
+        if (indriv_stdin != -1)
+            close(indriv_stdin);
+
+        /* Spawn new child with new resources. */
+        flags = G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_SEARCH_PATH;
+        if (!g_spawn_async_with_pipes(NULL, argv, NULL, flags, NULL, NULL,
+                                      &indriv_pid, &indriv_stdin, &child_stdout,
+                                      NULL, &err))
+        {
+            fprintf(stderr, __NAME__": Fatal: Could not launch input driver: %s\n", err->message);
+            g_error_free(err);
+            return FALSE;
+        }
+
+        indriv_stdout_channel = g_io_channel_unix_new(child_stdout);
+        if (indriv_stdout_channel == NULL)
+        {
+            fprintf(stderr, __NAME__": Fatal: Could open input driver's stdout\n");
+            return FALSE;
+        }
+    }
+
+    return TRUE;
 }
 
 gboolean
@@ -1175,7 +1208,7 @@ remote_msg(GIOChannel *channel, GIOCondition condition, gpointer data)
     gchar *line = NULL;
 
     g_io_channel_read_line(channel, &line, NULL, NULL, NULL);
-    input_driver_run(line, NULL);
+    input_driver_execute_command(line, NULL);
 
     return TRUE;
 }
