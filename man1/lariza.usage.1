@@ -150,6 +150,14 @@ still print a response. Use \fBunknown\fP to indicate that the event
 shall be propagated to WebKit and Gtk.
 .P
 \fBlariza\fP ignores the exit code of the input driver.
+.P
+After \fBlariza\fP has sent \fBexecute\fP and read the response, it can
+reuse the same child process to handle future events. This means that
+your input driver should not terminate after handling one event.
+Instead, keep it running in a loop, waiting for more events to come.
+This yields much better performance than re-spawning all the time.
+However, if your process quits or crashes, it will be re-spawned
+automatically as needed.
 .\" --------------------------------------------------------------------
 .SH "HOTKEYS"
 As mentioned above, the input driver handles user input. This applies to
