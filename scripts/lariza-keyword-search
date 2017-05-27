@@ -18,7 +18,7 @@ urlencode()
     printf '%s' "$1" | od -t x1 -An | tr ' ' '%' | tr -d '\n'
 }
 
-if test -r "$db"
+if [ -r "$db" ]
 then
     while read db_key db_pattern
     do

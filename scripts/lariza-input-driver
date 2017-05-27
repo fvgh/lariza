@@ -18,7 +18,7 @@
 # users are still able to customize it.
 
 per_user_driver=${XDG_CONFIG_HOME:-~/.config}/lariza/input-driver
-if test -x "$per_user_driver"
+if [ -x "$per_user_driver" ]
 then
     exec "$per_user_driver" "$@"
 fi
