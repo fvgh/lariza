@@ -53,7 +53,7 @@ execute()
             ;;
         hid_button)
             case "$key" in
-                2)  [ -n "$hover_uri" ] && echo go_uri_new_tab "$hover_uri"  ;;
+                2)  [ -n "$hover_uri" ] && echo go_uri_new_window "$hover_uri"  ;;
                 8)  echo  go_backward  ;;
                 9)  echo  go_forward   ;;
             esac
@@ -61,20 +61,20 @@ execute()
         hid_key)
             home=${LARIZA_HOME_URI:-about:blank}
             case "$key" in
-                Escape)  echo  abort_load              ;;
-                F2)      echo  go_backward             ;;
-                F3)      echo  go_forward              ;;
-                M-3)     echo  search_backward         ;;
-                M-c)     echo  reload_user_certs       ;;
-                M-d)     echo  download_manager_open   ;;
-                M-D)     echo  download_manager_close  ;;
-                M-e)     echo  go_uri_new_tab "$home"  ;;
-                M-k)     echo  search_initiate         ;;
-                M-l)     echo  focus_input_box         ;;
-                M-n)     echo  search_forward          ;;
-                M-q)     echo  close                   ;;
-                M-r)     echo  reload_page             ;;
-                M-w)     echo  go_uri "$home"          ;;
+                Escape)  echo  abort_load                 ;;
+                F2)      echo  go_backward                ;;
+                F3)      echo  go_forward                 ;;
+                M-3)     echo  search_backward            ;;
+                M-c)     echo  reload_user_certs          ;;
+                M-d)     echo  download_manager_open      ;;
+                M-D)     echo  download_manager_close     ;;
+                M-e)     echo  go_uri_new_window "$home"  ;;
+                M-k)     echo  search_initiate            ;;
+                M-l)     echo  focus_input_box            ;;
+                M-n)     echo  search_forward             ;;
+                M-q)     echo  close                      ;;
+                M-r)     echo  reload_page                ;;
+                M-w)     echo  go_uri "$home"             ;;
                 M-x)
                     # Replicating the behaviour of lariza's former
                     # "external handler" could be done as follows:

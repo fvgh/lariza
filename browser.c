@@ -49,7 +49,7 @@ static gboolean command_download_manager_open(struct Client *, struct CommandArg
 static gboolean command_focus_input_box(struct Client *, struct CommandArguments *);
 static gboolean command_go_backward(struct Client *, struct CommandArguments *);
 static gboolean command_go_forward(struct Client *, struct CommandArguments *);
-static gboolean command_go_uri_new_tab(struct Client *, struct CommandArguments *);
+static gboolean command_go_uri_new_window(struct Client *, struct CommandArguments *);
 static gboolean command_go_uri(struct Client *, struct CommandArguments *);
 static gboolean command_reload(struct Client *, struct CommandArguments *);
 static gboolean command_reload_user_certs(struct Client *, struct CommandArguments *);
@@ -148,7 +148,7 @@ client_new(const gchar *uri, WebKitWebView *related_wv, gboolean show)
 
     if (uri != NULL && cooperative_instances && !cooperative_alone)
     {
-        write(cooperative_pipe_fp, "go_uri_new_tab ", strlen("go_uri_new_tab "));
+        write(cooperative_pipe_fp, "go_uri_new_window ", strlen("go_uri_new_window "));
         write(cooperative_pipe_fp, uri, strlen(uri));
         write(cooperative_pipe_fp, "\n", 1);
         return NULL;
@@ -360,7 +360,7 @@ command_go_uri(struct Client *c, struct CommandArguments *a)
 }
 
 gboolean
-command_go_uri_new_tab(struct Client *c, struct CommandArguments *a)
+command_go_uri_new_window(struct Client *c, struct CommandArguments *a)
 {
     gchar *f;
 
@@ -1142,7 +1142,7 @@ load_command_hash(void)
     g_hash_table_insert(command_hash, "go_backward", command_go_backward);
     g_hash_table_insert(command_hash, "go_forward", command_go_forward);
     g_hash_table_insert(command_hash, "go_uri", command_go_uri);
-    g_hash_table_insert(command_hash, "go_uri_new_tab", command_go_uri_new_tab);
+    g_hash_table_insert(command_hash, "go_uri_new_window", command_go_uri_new_window);
     g_hash_table_insert(command_hash, "reload_page", command_reload);
     g_hash_table_insert(command_hash, "reload_user_certs", command_reload_user_certs);
     g_hash_table_insert(command_hash, "search_backward", command_search_backward);
