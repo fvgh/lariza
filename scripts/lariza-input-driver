@@ -25,6 +25,9 @@ fi
 
 execute()
 {
+    home=${LARIZA_HOME_URI:-about:blank}
+    spref=${LARIZA_SEARCH_PREFIX:-:/}
+
     case "$context" in
         inputbox)
             # The variable $context_specific_text contains the text
@@ -33,7 +36,14 @@ execute()
             #
             # Note that we redirect stdin here. Child processes must not
             # ever read from our stdin since that is the command pipe.
-            lariza-keyword-search "$context_specific_text" </dev/null
+            case "$context_specific_text" in
+                "$spref"*)
+                    echo search_new "${context_specific_text#$spref}"
+                    ;;
+                *)
+                    lariza-keyword-search "$context_specific_text" </dev/null
+                    ;;
+            esac
             ;;
         handle_context_menu_uri)
             # Do something with the URI in $context_specific_text.
@@ -59,7 +69,6 @@ execute()
             esac
             ;;
         hid_key)
-            home=${LARIZA_HOME_URI:-about:blank}
             case "$key" in
                 Escape)  echo  abort_load                 ;;
                 F2)      echo  go_backward                ;;
@@ -69,7 +78,7 @@ execute()
                 M-d)     echo  download_manager_open      ;;
                 M-D)     echo  download_manager_close     ;;
                 M-e)     echo  go_uri_new_window "$home"  ;;
-                M-k)     echo  search_initiate            ;;
+                M-k)     echo  focus_input_box "$spref"   ;;
                 M-l)     echo  focus_input_box            ;;
                 M-n)     echo  search_forward             ;;
                 M-q)     echo  close                      ;;

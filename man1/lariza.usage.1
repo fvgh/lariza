@@ -101,8 +101,10 @@ Close the download manager.
 \fBdownload_manager_open\fP
 Close the download manager.
 .TP
-\fBfocus_input_box\fP
-Jump to input box and select all text.
+\fBfocus_input_box\fP [\fItext\fP]
+Jump to input box. If \fItext\fP is specified, then the current contents
+of the input box will be replaced with that string. Otherwise, all
+current text is selected.
 .TP
 \fBgo_backward\fP
 Go backward in browsing history.
@@ -129,9 +131,8 @@ If a search has already been initiated, re-search backward.
 \fBsearch_forward\fP
 If a search has already been initiated, re-search forward.
 .TP
-\fBsearch_initiate\fP
-Jump to input box and pre-populate it with $\fBLARIZA_SEARCH_PREFIX\fP,
-thus allowing to easily initiate a new search.
+\fBsearch_new\fP \fItext\fP
+Initiate new search for \fItext\fP in the current document.
 .TP
 \fBzoom_decrease\fP
 Decrease zoom level in the window which was the origin of this event.

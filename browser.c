@@ -55,7 +55,7 @@ static gboolean command_reload(struct Client *, struct CommandArguments *);
 static gboolean command_reload_user_certs(struct Client *, struct CommandArguments *);
 static gboolean command_search_backward(struct Client *, struct CommandArguments *);
 static gboolean command_search_forward(struct Client *, struct CommandArguments *);
-static gboolean command_search_initiate(struct Client *, struct CommandArguments *);
+static gboolean command_search_new(struct Client *, struct CommandArguments *);
 static gboolean command_zoom_decrease(struct Client *, struct CommandArguments *);
 static gboolean command_zoom_increase(struct Client *, struct CommandArguments *);
 static gboolean command_zoom_reset(struct Client *, struct CommandArguments *);
@@ -319,6 +319,12 @@ command_focus_input_box(struct Client *c, struct CommandArguments *a)
 
     gtk_widget_grab_focus(c->location);
 
+    if (a->string != NULL)
+    {
+        gtk_entry_set_text(GTK_ENTRY(c->location), a->string);
+        gtk_editable_set_position(GTK_EDITABLE(c->location), -1);
+    }
+
     return TRUE;
 }
 
@@ -419,14 +425,14 @@ command_search_forward(struct Client *c, struct CommandArguments *a)
 }
 
 gboolean
-command_search_initiate(struct Client *c, struct CommandArguments *a)
+command_search_new(struct Client *c, struct CommandArguments *a)
 {
-    if (c == NULL)
+    if (c == NULL || a->string == NULL)
         return FALSE;
 
-    gtk_widget_grab_focus(c->location);
-    gtk_entry_set_text(GTK_ENTRY(c->location), search_prefix);
-    gtk_editable_set_position(GTK_EDITABLE(c->location), -1);
+    g_free(search_text);
+    search_text = g_strdup(a->string);
+    search(c, 0);
 
     return TRUE;
 }
@@ -1113,16 +1119,7 @@ key_location(GtkWidget *widget, GdkEvent *event, gpointer data)
             case GDK_KEY_Return:
                 gtk_widget_grab_focus(c->web_view);
                 t = gtk_entry_get_text(GTK_ENTRY(c->location));
-                if (t != NULL &&
-                    strncmp(t, search_prefix, strlen(search_prefix)) == 0)
-                {
-                    if (search_text != NULL)
-                        g_free(search_text);
-                    search_text = g_strdup(t + strlen(search_prefix));
-                    search(c, 0);
-                }
-                else
-                    input_driver(c, "inputbox", NULL, t);
+                input_driver(c, "inputbox", NULL, t);
                 return TRUE;
         }
     }
@@ -1147,7 +1144,7 @@ load_command_hash(void)
     g_hash_table_insert(command_hash, "reload_user_certs", command_reload_user_certs);
     g_hash_table_insert(command_hash, "search_backward", command_search_backward);
     g_hash_table_insert(command_hash, "search_forward", command_search_forward);
-    g_hash_table_insert(command_hash, "search_initiate", command_search_initiate);
+    g_hash_table_insert(command_hash, "search_new", command_search_new);
     g_hash_table_insert(command_hash, "zoom_decrease", command_zoom_decrease);
     g_hash_table_insert(command_hash, "zoom_increase", command_zoom_increase);
     g_hash_table_insert(command_hash, "zoom_reset", command_zoom_reset);
