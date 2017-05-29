@@ -351,21 +351,6 @@ command_go_forward(struct Client *c, struct CommandArguments *a)
 }
 
 gboolean
-command_go_uri(struct Client *c, struct CommandArguments *a)
-{
-    gchar *f;
-
-    if (c == NULL || a == NULL || a->string == NULL)
-        return FALSE;
-
-    f = ensure_uri_scheme(a->string);
-    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
-    g_free(f);
-
-    return TRUE;
-}
-
-gboolean
 command_go_uri_new_window(struct Client *c, struct CommandArguments *a)
 {
     gchar *f;
@@ -375,6 +360,21 @@ command_go_uri_new_window(struct Client *c, struct CommandArguments *a)
 
     f = ensure_uri_scheme(a->string);
     client_new(f, NULL, TRUE);
+    g_free(f);
+
+    return TRUE;
+}
+
+gboolean
+command_go_uri(struct Client *c, struct CommandArguments *a)
+{
+    gchar *f;
+
+    if (c == NULL || a == NULL || a->string == NULL)
+        return FALSE;
+
+    f = ensure_uri_scheme(a->string);
+    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(c->web_view), f);
     g_free(f);
 
     return TRUE;
