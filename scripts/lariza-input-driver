@@ -36,6 +36,13 @@ execute()
             #
             # Note that we redirect stdin here. Child processes must not
             # ever read from our stdin since that is the command pipe.
+            #
+            # Also note that the input box is virtually the only way a
+            # user can enter text. This means that searching for text
+            # within a document must be handled in this context as well.
+            # Traditionally, this is done by looking for a "search
+            # prefix": If the user's text starts with this prefix, then
+            # it's meant to be initiate a new search.
             case "$context_specific_text" in
                 "$spref"*)
                     echo search_new "${context_specific_text#$spref}"
