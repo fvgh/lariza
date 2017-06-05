@@ -47,6 +47,14 @@ You simply invoke the main program:
 Refer to the manpage for all options.
 
 
+Customization
+-------------
+
+Please read up on the concept of the "input driver". It's documented in
+the "usage" manpage and it also helps if you read the example input
+driver as well.
+
+
 Background information
 ----------------------
 
