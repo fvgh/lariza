@@ -14,6 +14,8 @@ next
     This allows for a great deal of user customization without having to
     touch the core program.
   - The former "external handler" is a special case of the input driver.
+  - There is no concept of a "home URI" in the core program anymore.
+    This is now up to your input driver and/or launcher scripts.
 
 v17.05  2017-05-21
   [Fixed]
